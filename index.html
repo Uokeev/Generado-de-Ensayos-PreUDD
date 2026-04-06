@@ -148,7 +148,10 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
     <div class="acard" data-acc="#1E88E5" data-bg="#D6EAFB" data-area="ciencias"><h3><span class="adot" style="background:#1E88E5"></span>Ciencias</h3><p>Biología, Física, Química</p></div>
     <div class="acard" data-acc="#2E7D6B" data-bg="#D0EBE5" data-area="historia"><h3><span class="adot" style="background:#2E7D6B"></span>Historia</h3><p>Historia, Geografía, Ciencias Sociales</p></div>
   </div>
-  <div class="brow"><span></span><button class="btn btnp" id="b1" disabled>Continuar →</button></div>
+  <div class="brow">
+    <button class="btn btns" id="btn-load-draft-s1" style="border-color:#369C9B;color:#369C9B">📂 Cargar borrador</button>
+    <button class="btn btnp" id="b1" disabled>Continuar →</button>
+  </div>
 </div>
 <div class="step" id="s2">
   <div class="hbar"><h2 id="s2-title">Nuevo ensayo</h2><span class="badge" id="b2badge"></span><div class="dots"><div class="dot done"></div><div class="dot cur"></div><div class="dot"></div></div></div>
@@ -1177,21 +1180,7 @@ return{};
 
 // ── FIREBASE & DRAFTS ──
 var db;
-try {
-  if (typeof firebase !== 'undefined') {
-    if (!firebase.apps.length) {
-      firebase.initializeApp({
-        apiKey: "AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA",
-        authDomain: "preudd-generador.firebaseapp.com",
-        projectId: "preudd-generador",
-        storageBucket: "preudd-generador.firebasestorage.app",
-        messagingSenderId: "306364945564",
-        appId: "1:306364945564:web:a5e11231aab1b297894959"
-      });
-    }
-    db = firebase.firestore();
-  }
-} catch(e) { console.warn('Firebase init error:', e); }
+// Firebase init handled lazily by initDB()
 
 function setStatus(msg, color) {
   var el = $('draft-status');
@@ -1228,27 +1217,9 @@ function serializeState() {
 }
 
 $('btn-save-draft').addEventListener('click', function() {
-  if (typeof firebase === 'undefined') {
-    setStatus('Firebase no cargó. Abre desde GitHub Pages, no desde Claude.', '#c00');
+  if (!initDB()) {
+    setStatus('Firebase no disponible. Abre desde GitHub Pages.', '#c00');
     return;
-  }
-  if (!db) {
-    try {
-      if (!firebase.apps.length) {
-        firebase.initializeApp({
-          apiKey: "AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA",
-          authDomain: "preudd-generador.firebaseapp.com",
-          projectId: "preudd-generador",
-          storageBucket: "preudd-generador.firebasestorage.app",
-          messagingSenderId: "306364945564",
-          appId: "1:306364945564:web:a5e11231aab1b297894959"
-        });
-      }
-      db = firebase.firestore();
-    } catch(e) {
-      setStatus('Error Firebase: ' + e.message, '#c00');
-      return;
-    }
   }
   var name = prompt('Nombre del borrador:', ($('f-nombre')||{value:''}).value || 'Borrador');
   if (!name) return;
@@ -1268,28 +1239,32 @@ $('btn-save-draft').addEventListener('click', function() {
   });
 });
 
-$('btn-load-draft').addEventListener('click', function() {
-  if (typeof firebase === 'undefined') {
-    setStatus('Firebase no cargó. Abre desde GitHub Pages, no desde Claude.', '#c00');
-    return;
-  }
-  if (!db) {
-    try {
-      if (!firebase.apps.length) {
-        firebase.initializeApp({
-          apiKey: "AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA",
-          authDomain: "preudd-generador.firebaseapp.com",
-          projectId: "preudd-generador",
-          storageBucket: "preudd-generador.firebasestorage.app",
-          messagingSenderId: "306364945564",
-          appId: "1:306364945564:web:a5e11231aab1b297894959"
-        });
-      }
-      db = firebase.firestore();
-    } catch(e) {
-      setStatus('Error Firebase: ' + e.message, '#c00');
-      return;
+function initDB() {
+  if (db) return true;
+  if (typeof firebase === 'undefined') return false;
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey: "AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA",
+        authDomain: "preudd-generador.firebaseapp.com",
+        projectId: "preudd-generador",
+        storageBucket: "preudd-generador.firebasestorage.app",
+        messagingSenderId: "306364945564",
+        appId: "1:306364945564:web:a5e11231aab1b297894959"
+      });
     }
+    db = firebase.firestore();
+    return true;
+  } catch(e) {
+    console.error('Firebase init:', e);
+    return false;
+  }
+}
+
+function openDraftsModal() {
+  if (!initDB()) {
+    alert('Firebase no disponible. Asegúrate de abrir desde GitHub Pages.');
+    return;
   }
   var modal = $('drafts-modal');
   var list = $('drafts-list');
@@ -1335,8 +1310,10 @@ $('btn-load-draft').addEventListener('click', function() {
   }).catch(function(e) {
     list.innerHTML = '<div style="font-size:12px;color:#c00;text-align:center;padding:1rem">Error: ' + e.message + '</div>';
   });
-});
+}
 
+$('btn-load-draft').addEventListener('click', openDraftsModal);
+$('btn-load-draft-s1').addEventListener('click', openDraftsModal);
 $('modal-close').addEventListener('click', function() {
   $('drafts-modal').style.display = 'none';
 });
@@ -1408,7 +1385,7 @@ function loadDraft(d) {
 
 // Auto-save draft every 3 minutes if there's content
 setInterval(function() {
-  if (!db) return;
+  if (!initDB()) return;
   var pqs = $('pqs');
   if (!pqs || pqs.querySelectorAll('.pqb').length === 0) return;
   var nombre = ($('f-nombre')||{value:''}).value;
