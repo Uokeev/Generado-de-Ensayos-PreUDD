@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-<title>Generador de Ensayos · Preuniversitario UDD</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<title>Generador de Material · Preuniversitario UDD</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Poppins',Arial,sans-serif;background:#f0f2f4;color:#1a1a1a}
@@ -82,6 +84,18 @@ body{font-family:'Poppins',Arial,sans-serif;background:#f0f2f4;color:#1a1a1a}
 .pinstr{background:#f5f5f5;border-left:2px solid;padding:3px 6px;font-size:7px;color:#444;margin-bottom:8px}
 .ppq{margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid #f0f0f0}
 .ppq:last-child{border-bottom:none}
+.mode-card{flex:1;border:2px solid var(--brd);border-radius:10px;padding:.8rem 1rem;cursor:pointer;text-align:center;background:var(--bg);transition:border-color .15s,background .15s}
+.mode-card:hover{border-color:var(--acc);background:var(--fondo)}
+.mode-card-sel{border-color:var(--acc);background:var(--fondo)}
+.ins-bar{position:absolute;bottom:-13px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s}
+.pqb,.txt-block{position:relative;overflow:visible;margin-bottom:22px}
+.pqb:hover,.txt-block:hover{z-index:10}
+.pqb:hover .ins-bar,.txt-block:hover .ins-bar{opacity:1;pointer-events:auto}
+.ins-bar::before{content:'';position:absolute;top:-8px;left:-20px;right:-20px;height:22px;pointer-events:auto}
+.ins-btn{font-size:10px;padding:3px 11px;border-radius:12px;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.1);background:#fff;transition:opacity .15s}
+.ins-btn-pq{border:1.5px solid var(--acc);color:var(--acc)}
+.ins-btn-txt{border:1.5px solid #6c3fcf;color:#6c3fcf}
+.ins-btn:hover{opacity:.75}
 .ppqn{font-size:8px;font-weight:600;margin-bottom:2px;color:#2D3748;line-height:1.4}
 .plec{background:#f8f8f8;border-left:2px solid #ccc;padding:2px 5px;font-size:6.5px;color:#555;margin-bottom:3px;font-style:italic}
 .tips-hdr{background:var(--acc);padding:7px 12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;border-radius:8px 8px 0 0}
@@ -92,12 +106,24 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
 <body>
 <div class="topbar">
   <img id="toplogo" style="height:30px;width:auto" alt="PreuUDD">
-  <span style="font-size:13px;color:rgba(255,255,255,.65)">Generador de Ensayos PAES 2026</span>
+  <span style="font-size:13px;color:rgba(255,255,255,.65)">Generador de Material PAES 2026</span>
 </div>
 <div class="app">
 <div class="step active" id="s1">
-  <div class="hbar"><h2>Nuevo ensayo</h2><div class="dots"><div class="dot cur"></div><div class="dot"></div><div class="dot"></div></div></div>
+  <div class="hbar"><h2 id="s1-title">Nuevo documento</h2><div class="dots"><div class="dot cur"></div><div class="dot"></div><div class="dot"></div></div></div>
   <p style="font-size:12px;color:var(--t2);margin-bottom:.5rem">Paso 1 — Selecciona el área</p>
+  <div style="display:flex;gap:8px;margin-bottom:1rem">
+    <div id="mode-ensayo" class="mode-card mode-card-sel" data-mode="ensayo">
+      <div style="font-size:18px;margin-bottom:4px">📝</div>
+      <div style="font-size:13px;font-weight:600">Ensayo</div>
+      <div style="font-size:11px;color:var(--t2);margin-top:2px">Selección múltiple · Con portada</div>
+    </div>
+    <div id="mode-guia" class="mode-card" data-mode="guia">
+      <div style="font-size:18px;margin-bottom:4px">📖</div>
+      <div style="font-size:13px;font-weight:600">Guía</div>
+      <div style="font-size:11px;color:var(--t2);margin-top:2px">Abierta + selección · Sin portada</div>
+    </div>
+  </div>
   <div id="tut-wrap" style="margin-bottom:1.2rem;border-radius:10px;overflow:hidden;border:1px solid #c8e6e6">
     <div id="tut-hdr" style="background:var(--mar);padding:9px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer">
       <div style="display:flex;align-items:center;gap:10px">
@@ -125,16 +151,18 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
   <div class="brow"><span></span><button class="btn btnp" id="b1" disabled>Continuar →</button></div>
 </div>
 <div class="step" id="s2">
-  <div class="hbar"><h2>Nuevo ensayo</h2><span class="badge" id="b2badge"></span><div class="dots"><div class="dot done"></div><div class="dot cur"></div><div class="dot"></div></div></div>
-  <p style="font-size:12px;color:var(--t2);margin-bottom:.5rem">Paso 2 — Tipo y datos generales</p>
+  <div class="hbar"><h2 id="s2-title">Nuevo ensayo</h2><span class="badge" id="b2badge"></span><div class="dots"><div class="dot done"></div><div class="dot cur"></div><div class="dot"></div></div></div>
+  <p id="s2-subtitle" style="font-size:12px;color:var(--t2);margin-bottom:.5rem">Paso 2 — Tipo y datos generales</p>
+  <div id="tipo-section">
   <div class="tipo-grid">
     <div class="tcard" data-tipo="Ensayo Diagnóstico" data-tiempo="50–60 min"><h4>Diagnóstico</h4><span>35–40 preguntas · 50–60 min</span></div>
     <div class="tcard" data-tipo="Ensayo Mensual" data-tiempo="75–90 min"><h4>Ensayo Mensual</h4><span>45–50 preguntas · 75–90 min</span></div>
     <div class="tcard" data-tipo="Mini Ensayo" data-tiempo="~20 min"><h4>Mini Ensayo</h4><span>15–20 preguntas · ~20 min</span></div>
   </div>
-  <div class="stitle">Información del ensayo</div>
+  </div><!-- /tipo-section -->
+  <div class="stitle" id="s2-stitle">Información del ensayo</div>
   <div class="frow">
-    <div class="field"><label>Nombre del ensayo</label><input id="f-nombre" type="text" placeholder="Ej: Ensayo Diagnóstico"></div>
+    <div class="field"><label id="lbl-nombre">Nombre del ensayo</label><input id="f-nombre" type="text" placeholder="Ej: Ensayo Diagnóstico"></div>
     <div class="field"><label>Semestre</label><input id="f-semestre" type="text" placeholder="Ej: Primer Semestre 2026"></div>
   </div>
   <div class="frow">
@@ -152,7 +180,7 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
   <div class="brow"><button class="btn btns" id="b2back">← Atrás</button><button class="btn btnp" id="b2btn" disabled>Armar preguntas →</button></div>
 </div>
 <div class="step" id="s3">
-  <div class="hbar"><h2>Nuevo ensayo</h2><span class="badge" id="b3badge"></span><div class="dots"><div class="dot done"></div><div class="dot done"></div><div class="dot cur"></div></div></div>
+  <div class="hbar"><h2 id="s3-title">Nuevo ensayo</h2><span class="badge" id="b3badge"></span><div class="dots"><div class="dot done"></div><div class="dot done"></div><div class="dot cur"></div></div></div>
   <p style="font-size:12px;color:var(--t2);margin-bottom:.8rem">Paso 3 — Escribe las preguntas</p>
   <div style="display:flex;gap:8px;margin-bottom:.8rem">
     <button class="btnadd" id="btn-addpq-top" style="flex:2;margin-top:0">+ Agregar pregunta</button>
@@ -179,10 +207,23 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
   </div>
   <div class="brow">
     <button class="btn btns" id="b3back">← Atrás</button>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btnp" id="btn-ensayo">Ensayo PDF</button>
-      <button class="btn btns" id="btn-hoja">Hoja de Respuestas</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btns" id="btn-save-draft" title="Guardar borrador en la nube" style="border-color:#369C9B;color:#369C9B">💾 Guardar</button>
+      <button class="btn btns" id="btn-load-draft" title="Cargar borrador guardado" style="border-color:#369C9B;color:#369C9B">📂 Borradores</button>
+      <button class="btn btnp" id="btn-ensayo">Generar PDF</button>
       <button class="btn btns" id="btn-sol">Solucionario</button>
+    </div>
+  </div>
+  <!-- Draft status -->
+  <div id="draft-status" style="font-size:11px;color:var(--t2);text-align:right;margin-top:6px;min-height:16px"></div>
+  <!-- Drafts modal -->
+  <div id="drafts-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:14px;padding:1.4rem;width:90%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:15px;font-weight:600;color:#2D3748">Borradores guardados</span>
+        <button id="modal-close" style="border:none;background:none;cursor:pointer;font-size:18px;color:#bbb">✕</button>
+      </div>
+      <div id="drafts-list" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px"></div>
     </div>
   </div>
 </div>
@@ -191,7 +232,7 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
 window.APP=(function(){
 var LOGO='data:image/png;base64,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';
 var SYMS=['²','³','⁴','√','∛','∫','∑','∏','π','∞','±','≤','≥','≠','≈','÷','×','·','α','β','γ','θ','Δ','λ','μ','σ','°','%','⁻¹','⁻²','→','←','↔','∈','∩','∪'];
-var S={area:'',acc:'#369C9B',accBg:'#D4EEED',tipo:'',tiempo:''};
+var S={area:'',acc:'#369C9B',accBg:'#D4EEED',tipo:'',tiempo:'',mode:'ensayo'};
 var pqN=0;
 
 function $(id){return document.getElementById(id);}
@@ -209,84 +250,111 @@ function toTitleCase(str){
 
 $('toplogo').src=LOGO;
 
+document.querySelectorAll('.mode-card').forEach(function(c){
+  c.addEventListener('click',function(){
+    document.querySelectorAll('.mode-card').forEach(function(x){x.classList.remove('mode-card-sel');});
+    c.classList.add('mode-card-sel');
+    S.mode=c.dataset.mode;
+    // Update tipo cards label
+    var t3=document.querySelector('[data-tipo="Mini Ensayo"]');
+    if(t3){t3.querySelector('h4').textContent=S.mode==='guia'?'Mini Guía':'Mini Ensayo';}
+    var t1=document.querySelector('[data-tipo="Ensayo Diagnóstico"]');
+    if(t1){t1.querySelector('h4').textContent=S.mode==='guia'?'Guía Diagnóstica':'Diagnóstico';}
+    var t2=document.querySelector('[data-tipo="Ensayo Mensual"]');
+    if(t2){t2.querySelector('h4').textContent=S.mode==='guia'?'Guía Mensual':'Ensayo Mensual';}
+    var btnGen=$('btn-ensayo');
+    if(btnGen) btnGen.textContent=S.mode==='guia'?'Guía PDF':'Ensayo PDF';
+    var btnSol=$('btn-sol');
+    if(btnSol) btnSol.textContent=S.mode==='guia'?'Respuestas':'Solucionario';
+    var s1t=$('s1-title');
+    if(s1t) s1t.textContent=S.mode==='guia'?'Nueva guía':'Nuevo ensayo';
+    // Show/hide qtype rows
+    document.querySelectorAll('[id^="qtype-row-"]').forEach(function(r){
+      r.style.display=S.mode==='guia'?'flex':'none';
+    });
+  });
+});
+
 
 // ── TUTORIAL ──
 var TUT_STEPS = [
   {
-    title: '👋 Bienvenido al Generador de Ensayos PreuUDD',
-    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Esta herramienta te permite crear ensayos PAES con formato profesional en pocos minutos. Sin necesidad de Word ni diseño.</p>'+
+    title: '👋 Bienvenido al Generador de Material PreuUDD',
+    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Esta herramienta permite crear <b>ensayos</b> y <b>guías</b> PAES con formato profesional. Todo desde el navegador, sin instalar nada.</p>'+
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
-        '<div style="flex:1;min-width:140px;background:#f0f7f7;border-radius:8px;padding:.8rem;text-align:center"><div style="font-size:20px;margin-bottom:4px">📝</div><div style="font-size:11px;color:#444;font-weight:500">Ensayo completo<br>con portada</div></div>'+
-        '<div style="flex:1;min-width:140px;background:#f0f7f7;border-radius:8px;padding:.8rem;text-align:center"><div style="font-size:20px;margin-bottom:4px">📋</div><div style="font-size:11px;color:#444;font-weight:500">Hoja de<br>respuestas</div></div>'+
-        '<div style="flex:1;min-width:140px;background:#f0f7f7;border-radius:8px;padding:.8rem;text-align:center"><div style="font-size:20px;margin-bottom:4px">🔑</div><div style="font-size:11px;color:#444;font-weight:500">Solucionario<br>docente</div></div>'+
+        '<div style="flex:1;min-width:120px;background:#f0f7f7;border-radius:8px;padding:.8rem;text-align:center"><div style="font-size:20px;margin-bottom:4px">📝</div><div style="font-size:11px;color:#444;font-weight:500">Ensayo<br>con portada</div></div>'+
+        '<div style="flex:1;min-width:120px;background:#f0f7f7;border-radius:8px;padding:.8rem;text-align:center"><div style="font-size:20px;margin-bottom:4px">📖</div><div style="font-size:11px;color:#444;font-weight:500">Guía<br>de estudio</div></div>'+
+        '<div style="flex:1;min-width:120px;background:#f0f7f7;border-radius:8px;padding:.8rem;text-align:center"><div style="font-size:20px;margin-bottom:4px">🔑</div><div style="font-size:11px;color:#444;font-weight:500">Solucionario<br>docente</div></div>'+
+        '<div style="flex:1;min-width:120px;background:#f0f7f7;border-radius:8px;padding:.8rem;text-align:center"><div style="font-size:20px;margin-bottom:4px">💾</div><div style="font-size:11px;color:#444;font-weight:500">Borradores<br>en la nube</div></div>'+
       '</div>'
   },
   {
-    title: '1️⃣  Elige el área y tipo de ensayo',
-    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Primero selecciona el <b>área</b> — cada una tiene su color de acento:</p>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">'+
-        '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;background:#D4EEED;font-size:12px;color:#2D3748;font-weight:500"><span style="width:10px;height:10px;border-radius:50%;background:#369C9B;flex-shrink:0;display:inline-block"></span>Lenguaje</div>'+
-        '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;background:#EEF0F3;font-size:12px;color:#2D3748;font-weight:500"><span style="width:10px;height:10px;border-radius:50%;background:#2D3748;flex-shrink:0;display:inline-block"></span>Matemáticas</div>'+
-        '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;background:#D6EAFB;font-size:12px;color:#2D3748;font-weight:500"><span style="width:10px;height:10px;border-radius:50%;background:#1E88E5;flex-shrink:0;display:inline-block"></span>Ciencias</div>'+
-        '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;background:#D0EBE5;font-size:12px;color:#2D3748;font-weight:500"><span style="width:10px;height:10px;border-radius:50%;background:#2E7D6B;flex-shrink:0;display:inline-block"></span>Historia</div>'+
+    title: '1️⃣  Elige modo, área y tipo',
+    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:10px">Primero selecciona el <b>modo</b>:</p>'+
+      '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+        '<div style="flex:1;padding:8px 10px;border-radius:8px;border:1.5px solid #369C9B;background:#f0f7f7;font-size:12px;color:#2D3748"><b>Ensayo</b> — selección múltiple, incluye portada y solucionario.</div>'+
+        '<div style="flex:1;padding:8px 10px;border-radius:8px;border:1.5px solid #6c3fcf;background:#f8f4ff;font-size:12px;color:#2D3748"><b>Guía</b> — preguntas abiertas y/o selección múltiple, sin portada.</div>'+
       '</div>'+
-      '<p style="font-size:12px;color:#666;line-height:1.6">Luego elige el tipo: <b>Diagnóstico</b> (35–40 preguntas), <b>Mensual</b> (45–50) o <b>Mini Ensayo</b> (~20 min).</p>'
+      '<p style="font-size:12px;color:#444;line-height:1.6;margin-bottom:8px">Luego elige el <b>área</b> (Lenguaje, Matemáticas, Ciencias, Historia) y el tipo: Diagnóstico, Mensual o Mini.</p>'+
+      '<p style="font-size:11px;color:#888">En modo Guía el tipo no es necesario — se va directo a los datos.</p>'
   },
   {
-    title: '2️⃣  Completa los datos del ensayo',
-    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Estos datos aparecen en la <b>portada</b> y en el encabezado de cada hoja:</p>'+
-      '<div style="display:flex;flex-direction:column;gap:7px">'+
-        '<div style="display:flex;gap:10px;align-items:center;font-size:12px;color:#444;background:#f8f9fa;padding:7px 10px;border-radius:7px"><span style="font-weight:600;min-width:120px;color:#2D3748">Nombre</span><span>Ej: <i>"Ensayo Diagnóstico"</i> — se formatea automáticamente.</span></div>'+
-        '<div style="display:flex;gap:10px;align-items:center;font-size:12px;color:#444;background:#f8f9fa;padding:7px 10px;border-radius:7px"><span style="font-weight:600;min-width:120px;color:#2D3748">Semestre</span><span>Ej: <i>"Primer Semestre 2026"</i></span></div>'+
-        '<div style="display:flex;gap:10px;align-items:center;font-size:12px;color:#444;background:#f8f9fa;padding:7px 10px;border-radius:7px"><span style="font-weight:600;min-width:120px;color:#2D3748">Fecha y puntaje</span><span>Opcionales, aparecen en el encabezado.</span></div>'+
-        '<div style="display:flex;gap:10px;align-items:center;font-size:12px;color:#444;background:#f8f9fa;padding:7px 10px;border-radius:7px"><span style="font-weight:600;min-width:120px;color:#2D3748">Mensaje portada</span><span>Instrucción o motivación para el alumno.</span></div>'+
+    title: '2️⃣  Completa los datos',
+    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Estos datos aparecen en la <b>portada</b> y el encabezado de cada hoja:</p>'+
+      '<div style="display:flex;flex-direction:column;gap:6px">'+
+        '<div style="display:flex;gap:10px;align-items:center;font-size:12px;padding:6px 10px;background:#f8f9fa;border-radius:7px"><span style="font-weight:600;min-width:130px;color:#2D3748">Nombre</span><span>Se formatea en Title Case automáticamente.</span></div>'+
+        '<div style="display:flex;gap:10px;align-items:center;font-size:12px;padding:6px 10px;background:#f8f9fa;border-radius:7px"><span style="font-weight:600;min-width:130px;color:#2D3748">Semestre</span><span>Ej: <i>Primer Semestre 2026</i></span></div>'+
+        '<div style="display:flex;gap:10px;align-items:center;font-size:12px;padding:6px 10px;background:#f8f9fa;border-radius:7px"><span style="font-weight:600;min-width:130px;color:#2D3748">Fecha y puntaje</span><span>Opcionales. Aparecen en encabezado y portada.</span></div>'+
+        '<div style="display:flex;gap:10px;align-items:center;font-size:12px;padding:6px 10px;background:#f8f9fa;border-radius:7px"><span style="font-weight:600;min-width:130px;color:#2D3748">Mensaje portada</span><span>Instrucción o motivación para el alumno (solo ensayo).</span></div>'+
       '</div>'
   },
   {
     title: '3️⃣  Redacta las preguntas',
-    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Cada pregunta tiene <b>bloques reordenables</b> con los botones ↑↓. Puedes combinarlos libremente:</p>'+
-      '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">'+
-        '<div style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:#444;padding:7px 10px;border-radius:7px;border:1px solid #e0e0e0"><span style="font-weight:600;color:var(--acc);min-width:90px;flex-shrink:0">Enunciado</span><span>Texto principal. Siempre presente, no se elimina.</span></div>'+
-        '<div style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:#444;padding:7px 10px;border-radius:7px;border:1px solid #e0e0e0"><span style="font-weight:600;color:var(--acc);min-width:90px;flex-shrink:0">+ Texto</span><span>Lectura o contexto adicional dentro de la pregunta.</span></div>'+
-        '<div style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:#444;padding:7px 10px;border-radius:7px;border:1px solid #e0e0e0"><span style="font-weight:600;color:var(--acc);min-width:90px;flex-shrink:0">+ Imagen</span><span>Sube o arrastra una imagen. Ubícala donde necesites.</span></div>'+
-        '<div style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:#444;padding:7px 10px;border-radius:7px;border:1px solid #e0e0e0"><span style="font-weight:600;color:var(--acc);min-width:90px;flex-shrink:0">+ Enunciado</span><span>Segunda sección de texto para intercalar con imágenes.</span></div>'+
-        '<div style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:#444;padding:7px 10px;border-radius:7px;border:1px solid #e0e0e0"><span style="font-weight:600;color:#6c3fcf;min-width:90px;flex-shrink:0">📖 Bloque texto</span><span>Texto compartido entre varias preguntas — como en la PAES real. Aparece entre preguntas en el PDF. También se puede reordenar con ↑↓.</span></div>'+
-        '<div style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:#444;padding:7px 10px;border-radius:7px;border:1px solid #e0e0e0"><span style="font-weight:600;color:var(--t2);min-width:90px;flex-shrink:0">Fuente</span><span>Campo opcional por pregunta. Ej: <i>"PAES 2023, Pregunta 12"</i>. Aparece en gris bajo la pregunta.</span></div>'+
+    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:10px">Cada pregunta tiene <b>bloques reordenables</b> con ↑↓. Usa los botones de la barra de herramientas:</p>'+
+      '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px">'+
+        '<div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;padding:6px 10px;border-radius:7px;border:1px solid #e0e0e0"><span style="font-weight:600;color:var(--acc);min-width:90px;flex-shrink:0">+ Texto</span><span>Lectura o fuente. Aparece en bloque con borde lateral en el PDF.</span></div>'+
+        '<div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;padding:6px 10px;border-radius:7px;border:1px solid #e0e0e0"><span style="font-weight:600;color:var(--acc);min-width:90px;flex-shrink:0">+ Imagen</span><span>Arrastra o haz clic. Se posiciona donde quieras dentro de la pregunta.</span></div>'+
+        '<div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;padding:6px 10px;border-radius:7px;border:1px solid #e0e0e0"><span style="font-weight:600;color:var(--acc);min-width:90px;flex-shrink:0">+ Enunciado</span><span>Segunda sección de texto para intercalar con imágenes en el medio.</span></div>'+
+        '<div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;padding:6px 10px;border-radius:7px;border:1px solid #f0c060"><span style="font-weight:600;color:#b45309;min-width:90px;flex-shrink:0">+ Espacio</span><span>Zona en blanco para desarrollo (con líneas, cuadriculado o liso). Ideal para Matemáticas.</span></div>'+
+      '</div>'+
+      '<p style="font-size:11px;color:#888">Usa ✕ para eliminar bloques opcionales. El enunciado principal no se puede eliminar.</p>'
+  },
+  {
+    title: '4️⃣  Texto compartido y fuente',
+    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Para preguntas que comparten una lectura o contexto común, usa el botón <b style="color:#6c3fcf">+ Bloque de texto</b> (disponible arriba y abajo del listado, y entre preguntas al hacer hover).</p>'+
+      '<div style="background:#f8f4ff;border:1.5px solid #c9b8f0;border-radius:8px;padding:.8rem;margin-bottom:10px;font-size:12px;color:#444">'+
+        '<b style="color:#6c3fcf">📖 Texto compartido</b> — aparece como bloque con borde calipso en el PDF, igual al formato PAES real. También se puede reordenar con ↑↓.'+
+      '</div>'+
+      '<p style="font-size:12px;color:#444;line-height:1.6">Cada pregunta tiene además un campo <b>Fuente</b> opcional (ej: <i>PAES 2023, Pregunta 12</i>) que aparece en gris cursiva bajo la pregunta en el PDF.</p>'
+  },
+  {
+    title: '5️⃣  Alternativas con imágenes y fórmulas',
+    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:10px">Cuando las respuestas son gráficos o tablas, usa el botón <b>🖼</b> en cada alternativa — el layout cambia a grilla 2×2 automáticamente.</p>'+
+      '<p style="font-size:12px;color:#444;margin-bottom:10px">Para fórmulas, escribe con <b>^ y _</b> y se convierten al instante:</p>'+
+      '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px">'+
+        '<div style="display:flex;align-items:center;gap:10px;font-size:12px;padding:5px 10px;background:#f0f7f7;border-radius:7px"><code style="background:#d8eeee;padding:2px 6px;border-radius:3px">x^2</code><span style="color:#888">→</span><span>x²</span><span style="color:#bbb;margin-left:auto">superíndice</span></div>'+
+        '<div style="display:flex;align-items:center;gap:10px;font-size:12px;padding:5px 10px;background:#f0f7f7;border-radius:7px"><code style="background:#d8eeee;padding:2px 6px;border-radius:3px">H_2O</code><span style="color:#888">→</span><span>H₂O</span><span style="color:#bbb;margin-left:auto">subíndice</span></div>'+
+        '<div style="display:flex;align-items:center;gap:10px;font-size:12px;padding:5px 10px;background:#f0f7f7;border-radius:7px"><code style="background:#d8eeee;padding:2px 6px;border-radius:3px">10^-5</code><span style="color:#888">→</span><span>10⁻⁵</span><span style="color:#bbb;margin-left:auto">exponente negativo</span></div>'+
+      '</div>'+
+      '<p style="font-size:11px;color:#888">También puedes usar el botón <b>Σ</b> para insertar símbolos como π, ∑, ≤, α directamente.</p>'
+  },
+  {
+    title: '6️⃣  Borradores en la nube',
+    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">El generador se conecta a la nube para que nunca pierdas tu trabajo:</p>'+
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">'+
+        '<div style="display:flex;gap:12px;align-items:center;padding:8px 12px;border-radius:8px;background:#f0f7f7;border-left:3px solid var(--acc)"><div style="font-size:18px">💾</div><div><div style="font-size:12px;font-weight:600;color:#2D3748;margin-bottom:2px">Guardar borrador</div><div style="font-size:11px;color:#666">Guarda con un nombre. Incluye preguntas, imágenes y orden.</div></div></div>'+
+        '<div style="display:flex;gap:12px;align-items:center;padding:8px 12px;border-radius:8px;background:#f0f7f7;border-left:3px solid var(--acc)"><div style="font-size:18px">📂</div><div><div style="font-size:12px;font-weight:600;color:#2D3748;margin-bottom:2px">Cargar borrador</div><div style="font-size:11px;color:#666">Lista los últimos 20 guardados. Cualquier voluntario puede acceder desde cualquier dispositivo.</div></div></div>'+
+        '<div style="display:flex;gap:12px;align-items:center;padding:8px 12px;border-radius:8px;background:#f8f9fa;border-left:3px solid #bbb"><div style="font-size:18px">⏱️</div><div><div style="font-size:12px;font-weight:600;color:#2D3748;margin-bottom:2px">Autoguardado</div><div style="font-size:11px;color:#666">Cada 3 minutos guarda automáticamente si hay preguntas y un nombre asignado.</div></div></div>'+
       '</div>'
   },
-    {
-    title: '4️⃣  Alternativas con imágenes',
-    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Cuando las respuestas son gráficos o tablas, usa el botón <b>🖼</b> en cada alternativa:</p>'+
-      '<div style="background:#f8f9fa;border-radius:8px;padding:.9rem;margin-bottom:12px">'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
-          '<div style="border:1px solid #ddd;border-radius:6px;padding:.6rem;text-align:center;font-size:11px;color:#666"><b style="color:#2D3748;display:block;margin-bottom:4px">A)</b><div style="background:#e8f4f4;height:40px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999">Gráfico A</div></div>'+
-          '<div style="border:1px solid #ddd;border-radius:6px;padding:.6rem;text-align:center;font-size:11px;color:#666"><b style="color:#2D3748;display:block;margin-bottom:4px">B)</b><div style="background:#e8f4f4;height:40px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999">Gráfico B</div></div>'+
-          '<div style="border:1px solid #ddd;border-radius:6px;padding:.6rem;text-align:center;font-size:11px;color:#666"><b style="color:#2D3748;display:block;margin-bottom:4px">C)</b><div style="background:#e8f4f4;height:40px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999">Gráfico C</div></div>'+
-          '<div style="border:1px solid #ddd;border-radius:6px;padding:.6rem;text-align:center;font-size:11px;color:#666"><b style="color:#2D3748;display:block;margin-bottom:4px">D)</b><div style="background:#e8f4f4;height:40px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999">Gráfico D</div></div>'+
-        '</div>'+
-      '</div>'+
-      '<p style="font-size:12px;color:#666;line-height:1.6">Al subir imágenes a las alternativas, el layout cambia automáticamente a <b>grilla 2×2</b>, igual al formato oficial PAES.</p>'
-  },
   {
-    title: '5️⃣  Fórmulas y símbolos',
-    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Escribe fórmulas con <b>^ y _</b> y se convierten automáticamente al escribir o pegar:</p>'+
-      '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">'+
-        '<div style="display:flex;align-items:center;gap:10px;font-size:12px;padding:6px 10px;background:#f0f7f7;border-radius:7px"><code style="background:#d8eeee;padding:2px 7px;border-radius:3px;font-size:12px">x^2</code><span style="color:#888">→</span><span style="font-size:14px">x²</span><span style="color:#bbb;margin-left:auto">superíndice</span></div>'+
-        '<div style="display:flex;align-items:center;gap:10px;font-size:12px;padding:6px 10px;background:#f0f7f7;border-radius:7px"><code style="background:#d8eeee;padding:2px 7px;border-radius:3px;font-size:12px">10^-5</code><span style="color:#888">→</span><span style="font-size:14px">10⁻⁵</span><span style="color:#bbb;margin-left:auto">exponente negativo</span></div>'+
-        '<div style="display:flex;align-items:center;gap:10px;font-size:12px;padding:6px 10px;background:#f0f7f7;border-radius:7px"><code style="background:#d8eeee;padding:2px 7px;border-radius:3px;font-size:12px">H_2O</code><span style="color:#888">→</span><span style="font-size:14px">H₂O</span><span style="color:#bbb;margin-left:auto">subíndice</span></div>'+
-        '<div style="display:flex;align-items:center;gap:10px;font-size:12px;padding:6px 10px;background:#f0f7f7;border-radius:7px"><code style="background:#d8eeee;padding:2px 7px;border-radius:3px;font-size:12px">x^{n+1}</code><span style="color:#888">→</span><span style="font-size:14px">xⁿ⁺¹</span><span style="color:#bbb;margin-left:auto">múltiples caracteres</span></div>'+
-      '</div>'+
-      '<p style="font-size:12px;color:#666;line-height:1.6">También puedes usar el botón <b>Σ</b> para insertar símbolos como π, ∑, ≤, α, → directamente.</p>'
-  },
-  {
-    title: '6️⃣  Genera los documentos',
-    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Al terminar de redactar, tienes tres opciones:</p>'+
+    title: '7️⃣  Genera los documentos',
+    content: '<p style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px">Al terminar tienes dos opciones:</p>'+
       '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">'+
-        '<div style="display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:8px;background:#f0f7f7;border-left:3px solid var(--acc)"><div style="font-size:20px">📄</div><div><div style="font-size:12px;font-weight:600;color:#2D3748;margin-bottom:2px">Ensayo PDF</div><div style="font-size:11px;color:#666">Incluye portada, encabezado, preguntas con alternativas e instrucciones.</div></div></div>'+
-        '<div style="display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:8px;background:#f0f7f7;border-left:3px solid var(--acc)"><div style="font-size:20px">📋</div><div><div style="font-size:12px;font-weight:600;color:#2D3748;margin-bottom:2px">Hoja de Respuestas</div><div style="font-size:11px;color:#666">Tabla con círculos para rellenar. Para entregar al alumno junto al ensayo.</div></div></div>'+
-        '<div style="display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:8px;background:#f3eeff;border-left:3px solid #6c3fcf"><div style="font-size:20px">🔑</div><div><div style="font-size:12px;font-weight:600;color:#2D3748;margin-bottom:2px">Solucionario</div><div style="font-size:11px;color:#666">Uso exclusivo docente. Muestra la alternativa correcta marcada con ● para cada pregunta.</div></div></div>'+
+        '<div style="display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:8px;background:#f0f7f7;border-left:3px solid var(--acc)"><div style="font-size:20px">📄</div><div><div style="font-size:12px;font-weight:600;color:#2D3748;margin-bottom:2px">Generar PDF</div><div style="font-size:11px;color:#666">Ensayo: incluye portada, encabezado y preguntas. Guía: encabezado directo y preguntas. En ambos casos, dale a Imprimir → Guardar como PDF.</div></div></div>'+
+        '<div style="display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:8px;background:#f3eeff;border-left:3px solid #6c3fcf"><div style="font-size:20px">🔑</div><div><div style="font-size:12px;font-weight:600;color:#2D3748;margin-bottom:2px">Solucionario</div><div style="font-size:11px;color:#666">Uso exclusivo docente. Respuestas en 2 columnas, cabe en una hoja carta.</div></div></div>'+
       '</div>'+
-      '<div style="background:#f0f7f7;border-radius:8px;padding:.7rem .9rem;font-size:12px;color:#444;text-align:center">🎉 <b>¡Listo para comenzar!</b> Cierra esta guía y selecciona el área de tu ensayo.</div>'
+      '<div style="background:#f0f7f7;border-radius:8px;padding:.7rem .9rem;font-size:12px;color:#444;text-align:center">🎉 <b>¡Listo para comenzar!</b> Cierra esta guía y selecciona el modo y área.</div>'
   }
 ];
 
@@ -342,6 +410,20 @@ function goS(n){
   var lbl={lenguaje:'Lenguaje',matematicas:'Matemáticas',ciencias:'Ciencias',historia:'Historia'};
   ['b2badge','b3badge'].forEach(function(id){var b=$(id);b.textContent=lbl[S.area]||'';b.style.background=S.accBg;b.style.color=S.acc;});
   setAcc(S.acc);
+  // Adjust step 2 for mode
+  if(n===2){
+    var isGuia=S.mode==='guia';
+    var t=$('s2-title');if(t)t.textContent=isGuia?'Nueva guía':'Nuevo ensayo';
+    var sub=$('s2-subtitle');if(sub)sub.textContent=isGuia?'Paso 2 — Datos de la guía':'Paso 2 — Tipo y datos generales';
+    var ts=$('tipo-section');if(ts)ts.style.display=isGuia?'none':'block';
+    var st=$('s2-stitle');if(st)st.textContent=isGuia?'Información de la guía':'Información del ensayo';
+    var ln=$('lbl-nombre');if(ln)ln.textContent=isGuia?'Nombre de la guía':'Nombre del ensayo';
+    var fn=$('f-nombre');if(fn)fn.placeholder=isGuia?'Ej: Guía Unidad 2 — Célula':'Ej: Ensayo Diagnóstico';
+    // In guía mode, auto-select a tipo so b2btn isn't blocked
+    if(isGuia&&!S.tipo){S.tipo='Guía';S.tiempo='Sin límite';$('b2btn').disabled=false;}
+    // Update step 3 title too
+    var s3h=$('s3-title');if(s3h)s3h.textContent=isGuia?'Nueva guía':'Nuevo ensayo';
+  }
 }
 
 $('b1').addEventListener('click',function(){goS(2);});
@@ -352,9 +434,9 @@ $('btn-addpq-top').addEventListener('click',function(){addPq();updPreview();});
 $('btn-addtxt-top').addEventListener('click',function(){addTextBlock();updPreview();});
 $('btn-addtxt').addEventListener('click',function(){addTextBlock();updPreview();});
 
-function addTextBlock(){
+function addTextBlock(refNode){
   var div=document.createElement('div');
-  div.style.cssText='background:#f8f4ff;border:1.5px solid #c9b8f0;border-radius:10px;margin-bottom:10px;overflow:hidden';
+  div.style.cssText='background:#f8f4ff;border:1.5px solid #c9b8f0;border-radius:10px;overflow:visible;position:relative';
   div.className='txt-block';
   // Header with reorder + delete
   var hdr=document.createElement('div');
@@ -384,7 +466,26 @@ function addTextBlock(){
   refInp.addEventListener('input',updPreview);
   body.appendChild(ta);body.appendChild(refInp);
   div.appendChild(hdr);div.appendChild(body);
-  $('pqs').appendChild(div);
+  // Insertion bar — absolute child, no DOM footprint
+  var insertBar=document.createElement('div');
+  insertBar.className='ins-bar';
+  var insPq=document.createElement('button');insPq.type='button';insPq.textContent='+ pregunta aquí';insPq.className='ins-btn ins-btn-pq';
+  var insTxt=document.createElement('button');insTxt.type='button';insTxt.textContent='+ texto aquí';insTxt.className='ins-btn ins-btn-txt';
+  insPq.addEventListener('click',function(e){
+    e.stopPropagation();
+    addPq(div.nextSibling);
+    updPreview();
+  });
+  insTxt.addEventListener('click',function(e){
+    e.stopPropagation();
+    addTextBlock(div.nextSibling);
+    updPreview();
+  });
+  insertBar.appendChild(insPq);insertBar.appendChild(insTxt);
+  div.appendChild(insertBar);
+  var pqsEl=$('pqs');
+  if(refNode) pqsEl.insertBefore(div,refNode);
+  else pqsEl.appendChild(div);
 }
 $('f-nombre').addEventListener('input',function(){this.value=toTitleCase(this.value);});
 
@@ -462,6 +563,21 @@ function mkSymBtn(targetId){
   wrap.appendChild(btn);wrap.appendChild(drop);return wrap;
 }
 
+function applySpStyle(el, style){
+  el.style.height = el.dataset.spHeight || '80px';
+  if(style==='lined'){
+    el.style.background='repeating-linear-gradient(to bottom,#fff 0px,#fff 24px,#d0e0f0 24px,#d0e0f0 25px)';
+    el.style.border='1px solid #d0e0f0';
+  } else if(style==='grid'){
+    el.style.background='repeating-linear-gradient(#e8eef8 0 1px,transparent 1px 100%),repeating-linear-gradient(90deg,#e8eef8 0 1px,transparent 1px 100%)';
+    el.style.backgroundSize='20px 20px';
+    el.style.border='1px solid #d0e0f0';
+  } else {
+    el.style.background='#fff';
+    el.style.border='1px solid #e0e0e0';
+  }
+}
+
 function mkDropZone(onFile){
   var dz=document.createElement('div');dz.className='drop-zone';
   dz.innerHTML='<div style="font-size:20px;margin-bottom:4px">🖼</div>Arrastra aquí o <u>haz clic</u>';
@@ -519,7 +635,7 @@ function mkImgBlock(bw,i,labelSuffix){
 }
 
 var extraCount={};
-function addPq(){
+function addPq(refNode){
   pqN++;var i=pqN;extraCount[i]=0;
 
   var div=document.createElement('div');div.className='pqb';div.id='pq-'+i;
@@ -541,7 +657,9 @@ function addPq(){
   var imgBtn=mk('button','tbtn','+ Imagen');
   var addEnBtn=mk('button','tbtn','+ Enunciado');
   addEnBtn.style.cssText+='background:#f0f7f7;color:var(--acc);border-color:var(--acc)';
-  tr.appendChild(lecBtn);tr.appendChild(imgBtn);tr.appendChild(addEnBtn);
+  var addSpBtn=mk('button','tbtn','+ Espacio');
+  addSpBtn.style.cssText+='background:#fff8e1;color:#b45309;border-color:#f0c060';
+  tr.appendChild(lecBtn);tr.appendChild(imgBtn);tr.appendChild(addEnBtn);tr.appendChild(addSpBtn);
 
   // Blocks wrap
   var bw=document.createElement('div');bw.id='bw-'+i;bw.style.cssText='display:flex;flex-direction:column;gap:5px;margin-bottom:.5rem';
@@ -571,6 +689,52 @@ function addPq(){
   imgBtn.addEventListener('click',function(){
     bw.appendChild(mkImgBlock(bw,i,''));
     imgBtn.classList.add('on');updPreview();
+  });
+
+  addSpBtn.addEventListener('click',function(){
+    extraCount[i]++;var n=extraCount[i];
+    var wrap=document.createElement('div');
+    wrap.style.cssText='border:1px solid #f0c060;border-radius:6px;background:#fffdf0;overflow:hidden';
+    // Header
+    var spHdr=document.createElement('div');
+    spHdr.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 8px;background:#fff8e1;border-bottom:1px solid #f0c060';
+    var spGrip=document.createElement('span');spGrip.textContent='⠿';spGrip.style.cssText='color:#d4a017;font-size:15px';
+    var spLbl=document.createElement('span');spLbl.style.cssText='font-size:11px;font-weight:600;color:#b45309;flex:1';spLbl.textContent='✏️  Espacio para desarrollo';
+    var spUp=document.createElement('button');spUp.type='button';spUp.textContent='↑';spUp.style.cssText='border:none;background:none;cursor:pointer;font-size:13px;color:#b45309;padding:0 3px';
+    var spDn=document.createElement('button');spDn.type='button';spDn.textContent='↓';spDn.style.cssText='border:none;background:none;cursor:pointer;font-size:13px;color:#b45309;padding:0 3px';
+    var spDel=document.createElement('button');spDel.type='button';spDel.textContent='✕';spDel.style.cssText='border:none;background:none;cursor:pointer;font-size:13px;color:#bbb;padding:0 3px';
+    spUp.addEventListener('click',function(){var p=wrap.previousElementSibling;if(p)bw.insertBefore(wrap,p);updPreview();});
+    spDn.addEventListener('click',function(){var nx=wrap.nextElementSibling;if(nx)bw.insertBefore(nx,wrap);updPreview();});
+    spDel.addEventListener('click',function(){wrap.remove();updPreview();});
+    // Height selector
+    var spCtrl=document.createElement('div');spCtrl.style.cssText='display:flex;align-items:center;gap:8px;padding:0 8px';
+    var spCtrlLbl=document.createElement('span');spCtrlLbl.textContent='Alto:';spCtrlLbl.style.cssText='font-size:11px;color:#b45309';
+    var spSel=document.createElement('select');spSel.style.cssText='font-size:11px;padding:2px 6px;border-radius:5px;border:1px solid #f0c060;background:#fff;color:#b45309;font-family:inherit';
+    [{v:'40px',l:'Pequeño (2 líneas)'},{v:'80px',l:'Mediano (4 líneas)'},{v:'140px',l:'Grande (7 líneas)'},{v:'220px',l:'Extra grande (11 líneas)'}].forEach(function(o){
+      var opt=document.createElement('option');opt.value=o.v;opt.textContent=o.l;spSel.appendChild(opt);
+    });
+    spSel.value='80px';
+    spSel.addEventListener('change',function(){spPreview.style.height=spSel.value;updPreview();});
+    // Style selector (lined / blank)
+    var spStyleSel=document.createElement('select');spStyleSel.style.cssText='font-size:11px;padding:2px 6px;border-radius:5px;border:1px solid #f0c060;background:#fff;color:#b45309;font-family:inherit';
+    [{v:'lined',l:'Con líneas'},{v:'blank',l:'En blanco'},{v:'grid',l:'Cuadriculado'}].forEach(function(o){
+      var opt=document.createElement('option');opt.value=o.v;opt.textContent=o.l;spStyleSel.appendChild(opt);
+    });
+    spStyleSel.addEventListener('change',function(){applySpStyle(spPreview,spStyleSel.value);updPreview();});
+    spCtrl.appendChild(spCtrlLbl);spCtrl.appendChild(spSel);spCtrl.appendChild(spStyleSel);
+    spHdr.appendChild(spGrip);spHdr.appendChild(spLbl);spHdr.appendChild(spCtrl);spHdr.appendChild(spUp);spHdr.appendChild(spDn);spHdr.appendChild(spDel);
+    // Preview area
+    var spPreview=document.createElement('div');
+    spPreview.style.cssText='height:80px;margin:8px;border-radius:4px;transition:height .2s';
+    spPreview.dataset.spHeight='80px';spPreview.dataset.spStyle='lined';
+    applySpStyle(spPreview,'lined');
+    wrap.dataset.blockId='space-'+i+'-'+n;
+    wrap.dataset.spHeight='80px';wrap.dataset.spStyle='lined';
+    spSel.addEventListener('change',function(){wrap.dataset.spHeight=spSel.value;});
+    spStyleSel.addEventListener('change',function(){wrap.dataset.spStyle=spStyleSel.value;});
+    wrap.appendChild(spHdr);wrap.appendChild(spPreview);
+    bw.appendChild(makeBlock('✏️ Espacio',wrap,true,bw));
+    updPreview();
   });
 
   addEnBtn.addEventListener('click',function(){
@@ -615,6 +779,40 @@ function addPq(){
   });
 
   // Respuesta
+  // Open/closed question toggle (only shown in guía mode)
+  var qTypeRow=document.createElement('div');
+  qTypeRow.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:6px';
+  qTypeRow.id='qtype-row-'+i;
+  if(S.mode!=='guia') qTypeRow.style.display='none';
+  var qTypeLbl=document.createElement('span');qTypeLbl.style.cssText='font-size:11px;color:var(--t2)';qTypeLbl.textContent='Tipo:';
+  var qTypeToggle=document.createElement('div');qTypeToggle.style.cssText='display:flex;gap:4px';
+  var btnCerrada=document.createElement('button');btnCerrada.type='button';btnCerrada.textContent='Selección múltiple';
+  btnCerrada.style.cssText='font-size:11px;padding:3px 9px;border-radius:5px;border:1.5px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer;font-family:inherit';
+  btnCerrada.dataset.qtype='cerrada';
+  var btnAbierta=document.createElement('button');btnAbierta.type='button';btnAbierta.textContent='Pregunta abierta';
+  btnAbierta.style.cssText='font-size:11px;padding:3px 9px;border-radius:5px;border:1.5px solid var(--brd);background:var(--bg);color:var(--t2);cursor:pointer;font-family:inherit';
+  btnAbierta.dataset.qtype='abierta';
+  var qTypeVal='cerrada';
+  function setQType(t){
+    qTypeVal=t;
+    if(t==='abierta'){
+      btnAbierta.style.background='var(--acc)';btnAbierta.style.color='#fff';btnAbierta.style.borderColor='var(--acc)';
+      btnCerrada.style.background='var(--bg)';btnCerrada.style.color='var(--t2)';btnCerrada.style.borderColor='var(--brd)';
+      altGrid.style.display='none';
+      rrow.style.display='none';
+    } else {
+      btnCerrada.style.background='var(--acc)';btnCerrada.style.color='#fff';btnCerrada.style.borderColor='var(--acc)';
+      btnAbierta.style.background='var(--bg)';btnAbierta.style.color='var(--t2)';btnAbierta.style.borderColor='var(--brd)';
+      altGrid.style.display='';
+      rrow.style.display='';
+    }
+    updPreview();
+  }
+  btnCerrada.addEventListener('click',function(){setQType('cerrada');});
+  btnAbierta.addEventListener('click',function(){setQType('abierta');});
+  qTypeToggle.appendChild(btnCerrada);qTypeToggle.appendChild(btnAbierta);
+  qTypeRow.appendChild(qTypeLbl);qTypeRow.appendChild(qTypeToggle);
+
   var rrow=document.createElement('div');rrow.className='rrow';
   var rlbl=document.createElement('label');rlbl.textContent='Respuesta correcta:';
   var rsel=document.createElement('select');rsel.id='rp-'+i;
@@ -630,14 +828,37 @@ function addPq(){
   srcInp.addEventListener('input',updPreview);
   srcRow.appendChild(srcLbl);srcRow.appendChild(srcInp);
 
-  div.appendChild(del);div.appendChild(num);div.appendChild(tr);div.appendChild(bw);div.appendChild(altGrid);div.appendChild(rrow);div.appendChild(srcRow);
-  $('pqs').appendChild(div);
+  div.appendChild(del);div.appendChild(num);div.appendChild(tr);div.appendChild(qTypeRow);div.appendChild(bw);div.appendChild(altGrid);div.appendChild(rrow);div.appendChild(srcRow);
+  // Insertion bar — absolute child, no DOM footprint
+  var insertBar=document.createElement('div');
+  insertBar.className='ins-bar';
+  var insPq=document.createElement('button');insPq.type='button';insPq.textContent='+ pregunta aquí';insPq.className='ins-btn ins-btn-pq';
+  var insTxt=document.createElement('button');insTxt.type='button';insTxt.textContent='+ texto aquí';insTxt.className='ins-btn ins-btn-txt';
+  insPq.addEventListener('click',function(e){
+    e.stopPropagation();
+    addPq(div.nextSibling);
+    updPreview();
+  });
+  insTxt.addEventListener('click',function(e){
+    e.stopPropagation();
+    addTextBlock(div.nextSibling);
+    updPreview();
+  });
+  insertBar.appendChild(insPq);insertBar.appendChild(insTxt);
+  div.appendChild(insertBar);
+  var pqsEl=$('pqs');
+  if(refNode) pqsEl.insertBefore(div,refNode);
+  else pqsEl.appendChild(div);
 }
 
 function getPqs(){
-  return Array.from(document.querySelectorAll('.pqb')).map(function(b,idx){
+  return Array.from($('pqs').children).filter(function(el){
+    return el.classList.contains('pqb');
+  }).map(function(b,idx){
     var i=b.id.replace('pq-','');
     var bw=$('bw-'+i);
+    var numSpan=b.querySelector('.pqnum span');
+    var realNum=numSpan?parseInt(numSpan.textContent.replace('Pregunta ',''))||idx+1:idx+1;
     var blocks=bw?Array.from(bw.querySelectorAll('.reorder-block')):[];
     var enun=($('en-'+i)||{value:''}).value;
     var segments=[];
@@ -647,16 +868,26 @@ function getPqs(){
       else if(bid.indexOf('Enunciado (')!==-1){var ta=bl.querySelector('textarea');if(ta&&ta.value)segments.push({type:'enun',text:ta.value});}
       else if(bid.indexOf('Texto')!==-1){var ta=bl.querySelector('textarea');if(ta&&ta.value){var ref=bl.querySelectorAll('input')[0];segments.push({type:'lec',text:ta.value,ref:ref?ref.value:''}); }}
       else if(bid.indexOf('Imagen')!==-1){var img=bl.querySelector('.block-body img');if(img)segments.push({type:'img',src:img.src});}
+      else if(bid.indexOf('Espacio')!==-1){
+        var inner=bl.querySelector('[data-sp-height]');
+        if(inner)segments.push({type:'space',height:inner.dataset.spHeight||'80px',style:inner.dataset.spStyle||'lined'});
+      }
     });
     var altImgs={A:'',B:'',C:'',D:''};
     ['A','B','C','D'].forEach(function(l){var el=$('aip-'+i+'-'+l);if(el){var im=el.querySelector('img');if(im)altImgs[l]=im.src;}});
-    return{num:idx+1,
+    return{num:realNum,
       enun:enun,
       alts:{A:($('al-'+i+'-A')||{value:''}).value,B:($('al-'+i+'-B')||{value:''}).value,C:($('al-'+i+'-C')||{value:''}).value,D:($('al-'+i+'-D')||{value:''}).value},
       altImgs:altImgs,
       resp:($('rp-'+i)||{value:''}).value,
       segments:segments,
-      source:($('src-'+i)||{value:''}).value};
+      source:($('src-'+i)||{value:''}).value,
+      qtype:(function(){
+        var r=$('qtype-row-'+i);
+        if(!r||r.style.display==='none') return 'cerrada';
+        var ab=r.querySelector('[data-qtype="abierta"]');
+        return ab&&ab.style.background.indexOf('rgb')!==-1&&ab.style.color==='rgb(255, 255, 255)'?'abierta':'cerrada';
+      })()};
   });
 }
 
@@ -674,38 +905,50 @@ function getF(){
     tiempoDisplay:tc||S.tiempo};
 }
 
-function updPreview(){
-  var pqs=getPqs(),f=getF();
-  var instrTxt=pqs.length+' preguntas · '+S.tiempo+(f.instrAd?' · '+f.instrAd:'');
-  // Collect all items in order (text blocks + questions)
-  var allItems=[];
+function renumberPqs(){
+  var idx=0;
   Array.from($('pqs').children).forEach(function(el){
     if(el.classList.contains('pqb')){
-      var found=pqs.find(function(q){return $('pq-'+q.num)===el||Array.from($('pqs').querySelectorAll('.pqb')).indexOf(el)===q.num-1;});
-      if(found)allItems.push({type:'q',q:found});
-    } else if(el.classList.contains('txt-block')){
-      var ta=el.querySelector('textarea');
-      var ref=el.querySelector('input[type=text]');
-      if(ta&&ta.value)allItems.push({type:'txt',text:ta.value,ref:ref?ref.value:''});
+      idx++;
+      var span=el.querySelector('.pqnum span');
+      if(span) span.textContent='Pregunta '+idx;
     }
   });
+}
 
-  var pqH=allItems.map(function(item){
-    if(item.type==='txt'){
-      return '<div style="margin-bottom:14px;padding:10px 14px;border-left:4px solid '+f.acc+';background:#f8f8f8;page-break-inside:avoid">'+
-        '<p style="font-size:9.5pt;color:#444;line-height:1.7;font-style:italic;margin-bottom:'+(item.ref?'4px':'0')+'">'+item.text+'</p>'+
-        (item.ref?'<div style="font-size:8pt;color:#888;font-style:normal">'+item.ref+'</div>':'')+
-      '</div>';
+function updPreview(){
+  renumberPqs();
+  var pqs=getPqs(),f=getF();
+  var instrTxt=pqs.length+' preguntas · '+S.tiempo+(f.instrAd?' · '+f.instrAd:'');
+  // Walk DOM in order — source of truth for sequence
+  var pqMap={};
+  pqs.forEach(function(q){ pqMap[q.num]=q; });
+
+  var isGuia = S.mode==='guia';
+
+  var pqH=Array.from($('pqs').children).map(function(el){
+    if(el.classList.contains('pqb')){
+      var numSpan=el.querySelector('.pqnum span');
+      var num=numSpan?parseInt(numSpan.textContent.replace('Pregunta ',''))||0:0;
+      var q=pqMap[num];
+      if(!q) return '';
+      var altH='<table width="100%" cellspacing="0" cellpadding="0"><tr>'+['A','B','C','D'].map(function(l){
+        return '<td style="width:25%;font-size:7px;padding:1px 4px 1px 0;vertical-align:top"><b style="color:'+f.acc+'">'+l+')</b> '+(q.alts[l]||'—')+'</td>';
+      }).join('')+'</tr></table>';
+      var segsH=(q.segments||[]).map(function(s){
+        if(s.type==='enun') return '<div class="ppqn"><b>'+q.num+'.</b> '+s.text+'</div>';
+        if(s.type==='lec') return '<div class="plec">'+s.text.slice(0,60)+(s.text.length>60?'…':'')+'</div>';
+        if(s.type==='img') return '<div style="text-align:center;margin:2px 0"><img src="'+s.src+'" style="max-height:28px"></div>';
+        if(s.type==='space') return '<div style="height:16px;background:#f5f5f5;border-radius:3px;margin:2px 0"></div>';
+        return '';
+      }).join('');
+      return '<div class="ppq">'+(segsH||'<div class="ppqn"><b>'+q.num+'.</b> <em style="color:#bbb;font-style:italic">Enunciado...</em></div>')+altH+'</div>';
+    } else if(el.classList.contains('txt-block')){
+      var ta=el.querySelector('textarea');
+      if(!ta||!ta.value) return '';
+      return '<div class="plec" style="margin-bottom:5px">'+ta.value.slice(0,80)+(ta.value.length>80?'…':'')+'</div>';
     }
-    var q=item.q;
-    var altH='<table width="100%" cellspacing="0" cellpadding="0"><tr>'+['A','B','C','D'].map(function(l){return '<td style="width:25%;font-size:7px;padding:1px 4px 1px 0;vertical-align:top"><b style="color:'+f.acc+'">'+l+')</b> '+(q.alts[l]||'—')+'</td>';}).join('')+'</tr></table>';
-    var segsH=(q.segments||[]).map(function(s){
-      if(s.type==='enun')return '<div class="ppqn"><b>'+q.num+'.</b> '+s.text+'</div>';
-      if(s.type==='lec')return '<div class="plec">'+s.text.slice(0,60)+(s.text.length>60?'…':'')+'</div>';
-      if(s.type==='img')return '<div style="text-align:center;margin:2px 0"><img src="'+s.src+'" style="max-height:28px"></div>';
-      return '';
-    }).join('');
-    return '<div class="ppq">'+(segsH||'<div class="ppqn"><b>'+q.num+'.</b> <em style="color:#bbb;font-style:italic">Enunciado...</em></div>')+altH+'</div>';
+    return '';
   }).join('');
   $('preview').innerHTML='<div class="pdoc">'+
     '<div class="ph"><div class="plogo"><img src="'+LOGO+'" style="height:20px;width:auto"></div>'+
@@ -746,6 +989,27 @@ function mkFlds(f){
     }).join('')+'</tr></table>';
 }
 
+function mkGuiaHdr(f){
+  return '<table width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:14px"><tr>'+
+    '<td width="150" style="background:#2D3748;padding:10px 15px;text-align:center;vertical-align:middle">'+
+      '<img src="'+LOGO+'" style="height:44px;width:auto;display:block;margin:0 auto">'+
+    '</td>'+
+    '<td style="background:'+f.acc+';padding:9px 15px;vertical-align:middle">'+
+      '<div style="font-size:7.5pt;color:rgba(255,255,255,.85);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Preuniversitario UDD · '+f.area+' · Guía de Estudio</div>'+
+      '<div style="font-size:13pt;color:#fff;font-weight:700;margin-bottom:1px">'+f.nombre+'</div>'+
+      '<div style="font-size:7.5pt;color:rgba(255,255,255,.8)">'+( f.semestre?f.semestre+' · ':'')+f.tiempoDisplay+'</div>'+
+    '</td>'+
+  '</tr></table>'+
+  '<table width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:14px"><tr>'+
+    [['Nombre completo',''],['Área',f.area],['Fecha',f.fechaFmt],['Puntaje / Nota',f.puntaje]].map(function(x){
+      return '<td style="width:25%;padding:0 10px 0 0;vertical-align:bottom">'+
+        '<div style="font-size:7pt;color:#888;margin-bottom:2px">'+x[0]+'</div>'+
+        '<div style="border-bottom:2px solid '+f.acc+';padding-bottom:2px;font-size:9pt;color:#2D3748;min-height:13px">'+x[1]+'</div>'+
+      '</td>';
+    }).join('')+
+  '</tr></table>';
+}
+
 function mkCover(f){
   return '<div style="page-break-after:always">'+
     '<table width="100%" cellspacing="0" cellpadding="0" style="height:960px">'+
@@ -768,12 +1032,22 @@ function mkCover(f){
 
 function openBlob(c){window.open(URL.createObjectURL(new Blob([c],{type:'text/html'})),'_blank');}
 
+function spBg(style){
+  if(style==='lined') return 'repeating-linear-gradient(to bottom,#fff 0px,#fff 24px,#bcd 24px,#bcd 25px)';
+  if(style==='grid') return 'repeating-linear-gradient(#dde 0 1px,transparent 1px 100%),repeating-linear-gradient(90deg,#dde 0 1px,transparent 1px 100%)';
+  return '#fff';
+}
 function renderSegs(q,f){
   var out='';
   (q.segments||[{type:'enun',text:q.enun}]).forEach(function(s){
     if(s.type==='enun')out+='<p style="font-size:10.5pt;color:#222;margin-bottom:7px;line-height:1.55;text-align:justify">'+s.text+'</p>';
     else if(s.type==='lec')out+='<div style="margin:0 0 8px 18px;padding:5px 10px;border-left:3px solid #aaa;font-size:9pt;color:#444;line-height:1.6;font-style:italic">'+s.text+(s.ref?'<div style="font-size:8pt;color:#888;margin-top:3px;font-style:normal">'+s.ref+'</div>':'')+'</div>';
     else if(s.type==='img')out+='<div style="margin:0 0 8px 0;text-align:center"><img src="'+s.src+'" style="max-height:130px;max-width:70%"></div>';
+    else if(s.type==='space'){
+      var bg=spBg(s.style);
+      var bgSize=s.style==='grid'?'background-size:20px 20px;':'';
+      out+='<div style="height:'+s.height+';margin:8px 0 10px;border:1px solid #ccd;border-radius:3px;background:'+bg+';'+bgSize+'"></div>';
+    }
   });
   return out;
 }
@@ -781,30 +1055,22 @@ function renderSegs(q,f){
 function genEnsayo(){
   var pqs=getPqs(),f=getF();
   var instrTxt='Esta prueba consta de '+pqs.length+' preguntas de selección múltiple. Tiempo estimado: '+f.tiempoDisplay+'. Marca tu respuesta en la hoja de respuestas adjunta.'+(f.instrAd?' '+f.instrAd:'');
-  // Collect all items in order (text blocks + questions)
-  var allItems=[];
-  Array.from($('pqs').children).forEach(function(el){
-    if(el.classList.contains('pqb')){
-      var found=pqs.find(function(q){return $('pq-'+q.num)===el||Array.from($('pqs').querySelectorAll('.pqb')).indexOf(el)===q.num-1;});
-      if(found)allItems.push({type:'q',q:found});
-    } else if(el.classList.contains('txt-block')){
-      var ta=el.querySelector('textarea');
-      var ref=el.querySelector('input[type=text]');
-      if(ta&&ta.value)allItems.push({type:'txt',text:ta.value,ref:ref?ref.value:''});
-    }
-  });
+  // Walk DOM in order — source of truth for sequence
+  var pqMap={};
+  pqs.forEach(function(q){ pqMap[q.num]=q; });
 
-  var pqH=allItems.map(function(item){
-    if(item.type==='txt'){
-      return '<div style="margin-bottom:14px;padding:10px 14px;border-left:4px solid '+f.acc+';background:#f8f8f8;page-break-inside:avoid">'+
-        '<p style="font-size:9.5pt;color:#444;line-height:1.7;font-style:italic;margin-bottom:'+(item.ref?'4px':'0')+'">'+item.text+'</p>'+
-        (item.ref?'<div style="font-size:8pt;color:#888;font-style:normal">'+item.ref+'</div>':'')+
-      '</div>';
-    }
-    var q=item.q;
+  var pqH=Array.from($('pqs').children).map(function(el){
+    if(el.classList.contains('pqb')){
+      var numSpan=el.querySelector('.pqnum span');
+      var num=numSpan?parseInt(numSpan.textContent.replace('Pregunta ',''))||0:0;
+      var q=pqMap[num];
+      if(!q) return '';
+      var q=q;
     var hasAltImg=q.altImgs&&(q.altImgs.A||q.altImgs.B||q.altImgs.C||q.altImgs.D);
-    var alts;
-    if(hasAltImg){
+      var alts;
+      if(q.qtype==='abierta'){
+        alts='<div style="height:120px;margin:8px 0;border:1px solid #ccd;border-radius:3px;background:repeating-linear-gradient(to bottom,#fff 0px,#fff 24px,#bcd 24px,#bcd 25px)"></div>';
+      } else if(hasAltImg){
       alts='<table width="100%" cellspacing="0" cellpadding="0" style="margin-top:6px">'+
         '<tr>'+['A','B'].map(function(l){return '<td style="width:50%;padding:5px 8px 5px 0;vertical-align:top"><div style="font-weight:700;font-size:10.5pt;margin-bottom:4px">'+l+')</div>'+(q.altImgs[l]?'<img src="'+q.altImgs[l]+'" style="max-width:100%;max-height:180px;border-radius:4px;display:block;margin-bottom:3px">':'')+(q.alts[l]?'<div style="font-size:9.5pt;color:#333">'+q.alts[l]+'</div>':'')+'</td>';}).join('')+'</tr>'+
         '<tr>'+['C','D'].map(function(l){return '<td style="width:50%;padding:5px 8px 5px 0;vertical-align:top"><div style="font-weight:700;font-size:10.5pt;margin-bottom:4px">'+l+')</div>'+(q.altImgs[l]?'<img src="'+q.altImgs[l]+'" style="max-width:100%;max-height:180px;border-radius:4px;display:block;margin-bottom:3px">':'')+(q.alts[l]?'<div style="font-size:9.5pt;color:#333">'+q.alts[l]+'</div>':'')+'</td>';}).join('')+'</tr>'+
@@ -812,46 +1078,297 @@ function genEnsayo(){
     } else {
       alts='<table width="100%" cellspacing="0" cellpadding="0"><tr>'+['A','B','C','D'].map(function(l){return '<td style="width:25%;font-size:10pt;padding:2px 8px 4px 0;vertical-align:top;line-height:1.4"><span style="font-weight:700">'+l+')</span> <span style="color:#222">'+(q.alts[l]||'—')+'</span></td>';}).join('')+'</tr></table>';
     }
-    return '<div style="margin-bottom:16px;page-break-inside:avoid">'+
-      '<div style="font-weight:700;font-size:10.5pt;color:#2D3748;margin-bottom:5px">'+q.num+'.</div>'+
-      renderSegs(q,f)+alts+
-      (q.source?'<div style="font-size:7.5pt;color:#aaa;margin-top:5px;font-style:italic">Fuente: '+q.source+'</div>':'')+
-    '</div>';
+      return '<div style="margin-bottom:16px;page-break-inside:avoid">'+
+        '<div style="font-weight:700;font-size:10.5pt;color:#2D3748;margin-bottom:5px">'+q.num+'.</div>'+
+        renderSegs(q,f)+alts+
+        (q.source?'<div style="font-size:7.5pt;color:#aaa;margin-top:5px;font-style:italic">Fuente: '+q.source+'</div>':'')+
+      '</div>';
+    } else if(el.classList.contains('txt-block')){
+      var ta=el.querySelector('textarea');
+      var ref=el.querySelectorAll('input[type=text]')[0];
+      if(!ta||!ta.value) return '';
+      return '<div style="margin-bottom:14px;padding:10px 14px;border-left:4px solid '+f.acc+';background:#f8f8f8;page-break-inside:avoid">'+
+        '<p style="font-size:9.5pt;color:#444;line-height:1.7;font-style:italic;margin-bottom:'+(ref&&ref.value?'4px':'0')+'">'+ta.value+'</p>'+
+        (ref&&ref.value?'<div style="font-size:8pt;color:#888;font-style:normal">'+ref.value+'</div>':'')+
+      '</div>';
+    }
+    return '';
   }).join('');
   openBlob('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+f.nombre+'</title>'+mkSt()+'</head><body>'+
     mkBar('PRE≡UDD · '+f.nombre,f.acc)+
     mkCover(f)+
-    mkHdr(f.nombre,f,false)+mkFlds(f)+
+    '<table width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:10px"><tr>'+
+      '<td style="background:#2D3748;padding:8px 14px;width:120px;text-align:center;vertical-align:middle">'+
+        '<img src="'+LOGO+'" style="height:32px;width:auto;display:block;margin:0 auto">'+
+      '</td>'+
+      '<td style="background:'+f.acc+';padding:7px 14px;vertical-align:middle">'+
+        '<div style="font-size:7pt;color:rgba(255,255,255,.85);text-transform:uppercase;letter-spacing:.4px">Preuniversitario UDD · '+f.area+'</div>'+
+        '<div style="font-size:11pt;color:#fff;font-weight:700">'+f.nombre+'</div>'+
+        '<div style="font-size:7pt;color:rgba(255,255,255,.8)">PAES 2026 · '+S.tiempo+(f.puntaje?' · '+f.puntaje:'')+'</div>'+
+      '</td>'+
+    '</tr></table>'+
+    '<table width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:10px"><tr>'+
+      [['Nombre completo',''],['Área',f.area],['Fecha',f.fechaFmt],['Puntaje / Nota',f.puntaje]].map(function(x){
+        return '<td style="width:25%;padding:0 10px 0 0;vertical-align:bottom">'+
+          '<div style="font-size:7pt;color:#888;margin-bottom:2px">'+x[0]+'</div>'+
+          '<div style="border-bottom:2px solid '+f.acc+';padding-bottom:2px;font-size:9pt;color:#2D3748;min-height:13px">'+x[1]+'</div>'+
+        '</td>';
+      }).join('')+
+    '</tr></table>'+
     '<div style="background:#f5f5f5;border-left:4px solid '+f.acc+';padding:7px 11px;border-radius:0 4px 4px 0;font-size:8.5pt;color:#444;margin-bottom:14px;line-height:1.5">'+instrTxt+'</div>'+
     pqH+'</body></html>');
 }
 
-function genHoja(){
-  var pqs=getPqs(),f=getF();
-  var rows=pqs.map(function(q,i){return '<tr style="background:'+(i%2?'#f9f9f9':'#fff')+'"><td style="text-align:center;font-size:11pt;font-weight:700;padding:10px 14px;border:1px solid #ddd;color:#2D3748">'+q.num+'</td>'+['A','B','C','D'].map(function(){return '<td style="text-align:center;padding:10px 22px;border:1px solid #ddd;font-size:22pt;color:#bbb;line-height:1">○</td>';}).join('')+'</tr>';}).join('');
-  openBlob('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Hoja de Respuestas</title>'+mkSt()+'</head><body>'+
-    mkBar('Hoja de Respuestas · '+f.nombre,f.acc)+mkHdr('Hoja de Respuestas',f,false)+mkFlds(f)+
-    '<p style="font-size:9pt;color:#666;margin-bottom:14px">Rellena el círculo de la alternativa correcta.</p>'+
-    '<table cellspacing="0" cellpadding="0"><tr><th style="background:#2D3748;color:#fff;padding:9px 14px;font-size:10pt;text-align:center">N°</th>'+
-    ['A','B','C','D'].map(function(l){return '<th style="background:'+f.acc+';color:#fff;padding:9px 22px;font-size:10pt;text-align:center">'+l+'</th>';}).join('')+'</tr>'+rows+'</table>'+
-    '<p style="font-size:8pt;color:#bbb;margin-top:18px">Preuniversitario UDD 2026</p></body></html>');
-}
+
 
 function genSol(){
   var pqs=getPqs(),f=getF();
-  var rows=pqs.map(function(q,i){return '<tr style="background:'+(i%2?'#f9f9f9':'#fff')+'"><td style="text-align:center;font-size:11pt;font-weight:700;padding:9px 13px;border:1px solid #ddd;color:#2D3748">'+q.num+'</td>'+['A','B','C','D'].map(function(l){var ok=q.resp===l;return '<td style="text-align:center;padding:9px 18px;border:1px solid #ddd;font-size:14pt;'+(ok?'background:'+f.acc+';color:#fff;font-weight:700':'color:#ccc')+'">'+(ok?'●':'○')+'</td>';}).join('')+'<td style="padding:8px 11px;border:1px solid #ddd;font-size:9pt;color:#555">'+(q.enun?q.enun.slice(0,65)+(q.enun.length>65?'…':''):'—')+'</td></tr>';}).join('');
-  openBlob('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Solucionario</title>'+mkSt()+'</head><body>'+
-    '<div class="np" style="background:#1a2535;color:#fff;padding:10px 20px;margin:-20px -28px 18px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:500">SOLUCIONARIO · '+f.nombre+' · USO EXCLUSIVO DOCENTE</span><button onclick="window.print()" style="background:#2D3748;border:1px solid rgba(255,255,255,.3);color:#fff;padding:6px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">Imprimir</button></div>'+
+  // Split into two columns
+  var half=Math.ceil(pqs.length/2);
+  var col1=pqs.slice(0,half);
+  var col2=pqs.slice(half);
+
+  function mkRow(q,i){
+    if(!q) return '<tr><td colspan="6" style="padding:7px"></td></tr>';
+    var bg=i%2?'#f7f7f7':'#fff';
+    return '<tr style="background:'+bg+'">'+
+      '<td style="text-align:center;font-size:10pt;font-weight:700;padding:7px 10px;border:1px solid #e0e0e0;color:#2D3748;min-width:28px">'+q.num+'</td>'+
+      ['A','B','C','D'].map(function(l){
+        var ok=q.resp===l;
+        return '<td style="text-align:center;padding:7px 12px;border:1px solid #e0e0e0;font-size:13pt;'+(ok?'background:'+f.acc+';color:#fff;font-weight:700':'color:#ddd')+'">'+(ok?'●':'○')+'</td>';
+      }).join('')+
+    '</tr>';
+  }
+
+  function mkCol(qs){
+    return '<table cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse">'+
+      '<tr>'+
+        '<th style="background:#2D3748;color:#fff;padding:7px 10px;font-size:9pt;text-align:center">N°</th>'+
+        ['A','B','C','D'].map(function(l){return '<th style="background:'+f.acc+';color:#fff;padding:7px 12px;font-size:9pt;text-align:center">'+l+'</th>';}).join('')+
+      '</tr>'+
+      qs.map(function(q,i){return mkRow(q,i);}).join('')+
+    '</table>';
+  }
+
+  var maxRows=Math.max(col1.length,col2.length);
+  // Pad col2 if shorter
+  while(col2.length<col1.length) col2.push(null);
+
+  openBlob('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Solucionario — '+f.nombre+'</title>'+mkSt()+'</head><body>'+
+    '<div class="np" style="background:#1a2535;color:#fff;padding:10px 20px;margin:-20px -28px 16px;display:flex;justify-content:space-between;align-items:center">'+
+      '<span style="font-size:13px;font-weight:500">SOLUCIONARIO · '+f.nombre+' · USO EXCLUSIVO DOCENTE</span>'+
+      '<button onclick="window.print()" style="background:#2D3748;border:1px solid rgba(255,255,255,.3);color:#fff;padding:6px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit">Imprimir</button>'+
+    '</div>'+
     mkHdr('Solucionario',f,true)+
-    '<p style="font-size:9pt;color:#666;margin-bottom:14px">La alternativa correcta aparece con ●. Uso exclusivo docente.</p>'+
-    '<table cellspacing="0" cellpadding="0" style="width:100%"><tr><th style="background:#2D3748;color:#fff;padding:9px 13px;font-size:10pt;text-align:center">N°</th>'+['A','B','C','D'].map(function(l){return '<th style="background:#2D3748;color:#fff;padding:9px 18px;font-size:10pt;text-align:center">'+l+'</th>';}).join('')+'<th style="background:#2D3748;color:#fff;padding:9px 13px;font-size:10pt;text-align:left">Enunciado</th></tr>'+rows+'</table>'+
-    '<p style="font-size:8pt;color:#bbb;margin-top:18px">Preuniversitario UDD 2026 · Documento confidencial</p></body></html>');
+    '<p style="font-size:8.5pt;color:#666;margin-bottom:12px">La alternativa correcta aparece con ●. Uso exclusivo docente.</p>'+
+    '<table cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse">'+
+      '<tr>'+
+        '<td style="width:50%;vertical-align:top;padding-right:12px">'+mkCol(col1)+'</td>'+
+        '<td style="width:50%;vertical-align:top;padding-left:12px">'+mkCol(col2)+'</td>'+
+      '</tr>'+
+    '</table>'+
+    '<p style="font-size:7.5pt;color:#bbb;margin-top:16px;text-align:center">Preuniversitario UDD 2026 · Documento confidencial de uso docente</p>'+
+  '</body></html>');
 }
 
 $('btn-ensayo').addEventListener('click',genEnsayo);
-$('btn-hoja').addEventListener('click',genHoja);
 $('btn-sol').addEventListener('click',genSol);
 return{};
+
+// ── FIREBASE & DRAFTS ──
+var db;
+try {
+  firebase.initializeApp({
+    apiKey: "AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA",
+    authDomain: "preudd-generador.firebaseapp.com",
+    projectId: "preudd-generador",
+    storageBucket: "preudd-generador.firebasestorage.app",
+    messagingSenderId: "306364945564",
+    appId: "1:306364945564:web:a5e11231aab1b297894959"
+  });
+  db = firebase.firestore();
+} catch(e) { console.warn('Firebase init error:', e); }
+
+function setStatus(msg, color) {
+  var el = $('draft-status');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--t2)'; }
+}
+
+function serializeState() {
+  var f = getF();
+  var pqs = getPqs();
+  // Collect all blocks in DOM order
+  var items = [];
+  Array.from($('pqs').children).forEach(function(el) {
+    if (el.classList.contains('pqb')) {
+      var i = el.id.replace('pq-','');
+      var numSpan = el.querySelector('.pqnum span');
+      var num = numSpan ? parseInt(numSpan.textContent.replace('Pregunta ','')) : 0;
+      var q = pqs.find(function(q){ return q.num === num; });
+      if (q) items.push({ type:'q', data: q });
+    } else if (el.classList.contains('txt-block')) {
+      var ta = el.querySelector('textarea');
+      var ref = el.querySelector('input[type=text]');
+      items.push({ type:'txt', text: ta?ta.value:'', ref: ref?ref.value:'' });
+    }
+  });
+  return {
+    mode: S.mode, area: S.area, acc: S.acc, accBg: S.accBg,
+    tipo: S.tipo, tiempo: S.tiempo,
+    nombre: f.nombre, semestre: f.semestre, fecha: f.fecha,
+    puntaje: f.puntaje, instrAd: f.instrAd, mensaje: f.mensaje,
+    tiempoCustom: ($('f-tiempo-custom')||{value:''}).value,
+    items: items,
+    savedAt: new Date().toISOString()
+  };
+}
+
+$('btn-save-draft').addEventListener('click', function() {
+  if (!db) { setStatus('Sin conexión a Firebase.', '#c00'); return; }
+  var name = prompt('Nombre del borrador:', ($('f-nombre')||{value:''}).value || 'Borrador');
+  if (!name) return;
+  setStatus('Guardando...', '#369C9B');
+  var data = serializeState();
+  data.name = name;
+  db.collection('borradores').add(data).then(function(doc) {
+    setStatus('Guardado: "' + name + '"', '#369C9B');
+  }).catch(function(e) {
+    setStatus('Error al guardar: ' + e.message, '#c00');
+  });
+});
+
+$('btn-load-draft').addEventListener('click', function() {
+  if (!db) { setStatus('Sin conexión a Firebase.', '#c00'); return; }
+  var modal = $('drafts-modal');
+  var list = $('drafts-list');
+  modal.style.display = 'flex';
+  list.innerHTML = '<div style="font-size:12px;color:var(--t2);text-align:center;padding:1rem">Cargando...</div>';
+  db.collection('borradores').orderBy('savedAt','desc').limit(20).get().then(function(snap) {
+    if (snap.empty) {
+      list.innerHTML = '<div style="font-size:12px;color:var(--t2);text-align:center;padding:1rem">No hay borradores guardados.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    snap.forEach(function(doc) {
+      var d = doc.data();
+      var card = document.createElement('div');
+      card.style.cssText = 'border:1px solid var(--brd);border-radius:8px;padding:.7rem 1rem;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;transition:background .15s';
+      card.addEventListener('mouseenter', function(){ card.style.background='#f0f7f7'; });
+      card.addEventListener('mouseleave', function(){ card.style.background=''; });
+      var info = document.createElement('div');
+      var fecha = d.savedAt ? new Date(d.savedAt).toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+      info.innerHTML = '<div style="font-size:13px;font-weight:500;color:#2D3748">' + (d.name||'Sin nombre') + '</div>' +
+        '<div style="font-size:11px;color:var(--t2)">' + (d.area||'') + (d.modo==='guia'?' · Guía':' · Ensayo') + (fecha?' · '+fecha:'') + '</div>';
+      var btns = document.createElement('div');
+      btns.style.cssText = 'display:flex;gap:6px;flex-shrink:0';
+      var loadBtn = document.createElement('button');
+      loadBtn.textContent = 'Cargar';
+      loadBtn.style.cssText = 'font-size:11px;padding:3px 10px;border:1.5px solid #369C9B;border-radius:6px;background:#369C9B;color:#fff;cursor:pointer;font-family:inherit';
+      var delBtn = document.createElement('button');
+      delBtn.textContent = '✕';
+      delBtn.style.cssText = 'font-size:11px;padding:3px 8px;border:1.5px solid var(--brd);border-radius:6px;background:none;color:#bbb;cursor:pointer;font-family:inherit';
+      loadBtn.addEventListener('click', function() {
+        modal.style.display = 'none';
+        loadDraft(d);
+      });
+      delBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (!confirm('¿Eliminar borrador "' + (d.name||'Sin nombre') + '"?')) return;
+        doc.ref.delete().then(function(){ card.remove(); });
+      });
+      btns.appendChild(loadBtn); btns.appendChild(delBtn);
+      card.appendChild(info); card.appendChild(btns);
+      list.appendChild(card);
+    });
+  }).catch(function(e) {
+    list.innerHTML = '<div style="font-size:12px;color:#c00;text-align:center;padding:1rem">Error: ' + e.message + '</div>';
+  });
+});
+
+$('modal-close').addEventListener('click', function() {
+  $('drafts-modal').style.display = 'none';
+});
+$('drafts-modal').addEventListener('click', function(e) {
+  if (e.target === $('drafts-modal')) $('drafts-modal').style.display = 'none';
+});
+
+function loadDraft(d) {
+  // Restore S state
+  S.mode = d.mode || 'ensayo';
+  S.area = d.area || 'ciencias';
+  S.acc = d.acc || '#369C9B';
+  S.accBg = d.accBg || '#D4EEED';
+  S.tipo = d.tipo || '';
+  S.tiempo = d.tiempo || '';
+  setAcc(S.acc);
+
+  // Go to step 2 then 3
+  goS(2);
+  // Restore form fields
+  if ($('f-nombre')) $('f-nombre').value = d.nombre || '';
+  if ($('f-semestre')) $('f-semestre').value = d.semestre || '';
+  if ($('f-fecha')) $('f-fecha').value = d.fecha || '';
+  if ($('f-puntaje')) $('f-puntaje').value = d.puntaje || '';
+  if ($('f-instr')) $('f-instr').value = d.instrAd || '';
+  if ($('f-mensaje')) $('f-mensaje').value = d.mensaje || '';
+  if ($('f-tiempo-custom')) $('f-tiempo-custom').value = d.tiempoCustom || '';
+  $('b2btn').disabled = false;
+
+  // Restore area card selection
+  document.querySelectorAll('.acard').forEach(function(c) {
+    c.classList.toggle('sel', c.dataset.area === d.area);
+  });
+  // Restore mode card
+  document.querySelectorAll('.mode-card').forEach(function(c) {
+    c.classList.toggle('mode-card-sel', c.dataset.mode === d.mode);
+  });
+
+  // Go to step 3 and rebuild questions
+  goS(3);
+  $('pqs').innerHTML = '';
+  pqN = 0; extraCount = {};
+
+  (d.items || []).forEach(function(item) {
+    if (item.type === 'q') {
+      addPq();
+      var i = pqN;
+      var q = item.data;
+      if ($('en-'+i)) $('en-'+i).value = q.enun || '';
+      ['A','B','C','D'].forEach(function(l) {
+        if ($('al-'+i+'-'+l)) $('al-'+i+'-'+l).value = q.alts[l] || '';
+      });
+      if ($('rp-'+i)) $('rp-'+i).value = q.resp || '';
+      if ($('src-'+i)) $('src-'+i).value = q.source || '';
+    } else if (item.type === 'txt') {
+      addTextBlock();
+      var lastTxt = $('pqs').querySelector('.txt-block:last-of-type');
+      if (lastTxt) {
+        var ta = lastTxt.querySelector('textarea');
+        var ref = lastTxt.querySelector('input[type=text]');
+        if (ta) ta.value = item.text || '';
+        if (ref) ref.value = item.ref || '';
+      }
+    }
+  });
+  updPreview();
+  setStatus('Borrador "' + (d.name||'') + '" cargado.', '#369C9B');
+}
+
+// Auto-save draft every 3 minutes if there's content
+setInterval(function() {
+  if (!db) return;
+  var pqs = $('pqs');
+  if (!pqs || pqs.querySelectorAll('.pqb').length === 0) return;
+  var nombre = ($('f-nombre')||{value:''}).value;
+  if (!nombre) return;
+  var data = serializeState();
+  data.name = '(auto) ' + nombre;
+  db.collection('borradores').add(data).then(function() {
+    setStatus('Autoguardado', '#aaa');
+    setTimeout(function(){ setStatus(''); }, 3000);
+  });
+}, 3 * 60 * 1000);
+
 })();
 </script>
 </body>
