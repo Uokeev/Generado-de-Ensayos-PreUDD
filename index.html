@@ -1178,15 +1178,19 @@ return{};
 // ── FIREBASE & DRAFTS ──
 var db;
 try {
-  firebase.initializeApp({
-    apiKey: "AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA",
-    authDomain: "preudd-generador.firebaseapp.com",
-    projectId: "preudd-generador",
-    storageBucket: "preudd-generador.firebasestorage.app",
-    messagingSenderId: "306364945564",
-    appId: "1:306364945564:web:a5e11231aab1b297894959"
-  });
-  db = firebase.firestore();
+  if (typeof firebase !== 'undefined') {
+    if (!firebase.apps.length) {
+      firebase.initializeApp({
+        apiKey: "AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA",
+        authDomain: "preudd-generador.firebaseapp.com",
+        projectId: "preudd-generador",
+        storageBucket: "preudd-generador.firebasestorage.app",
+        messagingSenderId: "306364945564",
+        appId: "1:306364945564:web:a5e11231aab1b297894959"
+      });
+    }
+    db = firebase.firestore();
+  }
 } catch(e) { console.warn('Firebase init error:', e); }
 
 function setStatus(msg, color) {
@@ -1224,21 +1228,69 @@ function serializeState() {
 }
 
 $('btn-save-draft').addEventListener('click', function() {
-  if (!db) { setStatus('Sin conexión a Firebase.', '#c00'); return; }
+  if (typeof firebase === 'undefined') {
+    setStatus('Firebase no cargó. Abre desde GitHub Pages, no desde Claude.', '#c00');
+    return;
+  }
+  if (!db) {
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp({
+          apiKey: "AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA",
+          authDomain: "preudd-generador.firebaseapp.com",
+          projectId: "preudd-generador",
+          storageBucket: "preudd-generador.firebasestorage.app",
+          messagingSenderId: "306364945564",
+          appId: "1:306364945564:web:a5e11231aab1b297894959"
+        });
+      }
+      db = firebase.firestore();
+    } catch(e) {
+      setStatus('Error Firebase: ' + e.message, '#c00');
+      return;
+    }
+  }
   var name = prompt('Nombre del borrador:', ($('f-nombre')||{value:''}).value || 'Borrador');
   if (!name) return;
   setStatus('Guardando...', '#369C9B');
   var data = serializeState();
   data.name = name;
-  db.collection('borradores').add(data).then(function(doc) {
-    setStatus('Guardado: "' + name + '"', '#369C9B');
+  // Check size — Firestore max 1MB per document
+  var json = JSON.stringify(data);
+  if (json.length > 900000) {
+    setStatus('Borrador muy grande (imágenes). Reduce el tamaño de las imágenes.', '#c00');
+    return;
+  }
+  db.collection('borradores').add(data).then(function() {
+    setStatus('✓ Guardado: "' + name + '"', '#369C9B');
   }).catch(function(e) {
     setStatus('Error al guardar: ' + e.message, '#c00');
   });
 });
 
 $('btn-load-draft').addEventListener('click', function() {
-  if (!db) { setStatus('Sin conexión a Firebase.', '#c00'); return; }
+  if (typeof firebase === 'undefined') {
+    setStatus('Firebase no cargó. Abre desde GitHub Pages, no desde Claude.', '#c00');
+    return;
+  }
+  if (!db) {
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp({
+          apiKey: "AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA",
+          authDomain: "preudd-generador.firebaseapp.com",
+          projectId: "preudd-generador",
+          storageBucket: "preudd-generador.firebasestorage.app",
+          messagingSenderId: "306364945564",
+          appId: "1:306364945564:web:a5e11231aab1b297894959"
+        });
+      }
+      db = firebase.firestore();
+    } catch(e) {
+      setStatus('Error Firebase: ' + e.message, '#c00');
+      return;
+    }
+  }
   var modal = $('drafts-modal');
   var list = $('drafts-list');
   modal.style.display = 'flex';
