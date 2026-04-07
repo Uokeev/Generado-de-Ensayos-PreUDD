@@ -1278,20 +1278,36 @@ function serializeState() {
 }
 
 $('btn-save-draft').addEventListener('click', function() {
-  var name = prompt('Nombre del borrador:', ($('f-nombre')||{value:''}).value || 'Borrador');
-  if (!name) return;
+  console.log('[PreuUDD] Botón guardar presionado');
+  var nombreEl = $('f-nombre');
+  console.log('[PreuUDD] f-nombre:', nombreEl ? nombreEl.value : 'NO ENCONTRADO');
+  var name = prompt('Nombre del borrador:', (nombreEl||{value:''}).value || 'Borrador');
+  console.log('[PreuUDD] Nombre ingresado:', name);
+  if (!name) { console.log('[PreuUDD] Cancelado'); return; }
   setStatus('Guardando...', '#369C9B');
-  var data = serializeState();
+  var data;
+  try {
+    data = serializeState();
+    console.log('[PreuUDD] serializeState OK, items:', data.items ? data.items.length : 0);
+  } catch(e) {
+    console.error('[PreuUDD] Error en serializeState:', e);
+    setStatus('Error interno: ' + e.message, '#c00');
+    return;
+  }
   data.name = name;
   var json = JSON.stringify(data);
+  console.log('[PreuUDD] Tamaño borrador:', json.length, 'bytes');
   if (json.length > 900000) {
     setStatus('Borrador muy grande. Reduce el tamaño de las imágenes.', '#c00');
     return;
   }
+  console.log('[PreuUDD] Enviando a Firestore:', FB_BASE);
   fbAdd(data).then(function(res) {
+    console.log('[PreuUDD] Respuesta Firestore:', JSON.stringify(res).slice(0,200));
     if (res.error) throw new Error(res.error.message);
     setStatus('✓ Guardado: "' + name + '"', '#369C9B');
   }).catch(function(e) {
+    console.error('[PreuUDD] Error fetch:', e);
     setStatus('Error: ' + e.message, '#c00');
   });
 });
