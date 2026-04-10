@@ -1179,8 +1179,6 @@ function genSol(){
 
 $('btn-ensayo').addEventListener('click',genEnsayo);
 $('btn-sol').addEventListener('click',genSol);
-return{};
-
 // ── FIREBASE REST API (no SDK, no eval) ──
 var FB_PROJECT = 'preudd-generador';
 var FB_KEY = 'AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA';
@@ -1441,6 +1439,8 @@ setInterval(function() {
     setTimeout(function(){ setStatus(''); }, 3000);
   });
 }, 3 * 60 * 1000);
+
+return{};
 
 })();
 </script>
