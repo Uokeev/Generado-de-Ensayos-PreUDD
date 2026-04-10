@@ -1180,6 +1180,7 @@ return{};
 var FB_PROJECT = 'preudd-generador';
 var FB_KEY = 'AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA';
 var FB_BASE = 'https://firestore.googleapis.com/v1/projects/'+FB_PROJECT+'/databases/(default)/documents/borradores';
+console.log('[PreuUDD] FB_BASE:', FB_BASE);
 
 function fbToObj(doc) {
   // Convert Firestore document fields to plain JS object
@@ -1279,6 +1280,7 @@ function serializeState() {
 
 $('btn-save-draft').addEventListener('click', function() {
   console.log('[PreuUDD] Botón guardar presionado');
+  setStatus('Iniciando guardado...', '#369C9B');
   var nombreEl = $('f-nombre');
   console.log('[PreuUDD] f-nombre:', nombreEl ? nombreEl.value : 'NO ENCONTRADO');
   var name = prompt('Nombre del borrador:', (nombreEl||{value:''}).value || 'Borrador');
@@ -1302,13 +1304,17 @@ $('btn-save-draft').addEventListener('click', function() {
     return;
   }
   console.log('[PreuUDD] Enviando a Firestore:', FB_BASE);
+  setStatus('Conectando con Firebase...', '#369C9B');
   fbAdd(data).then(function(res) {
-    console.log('[PreuUDD] Respuesta Firestore:', JSON.stringify(res).slice(0,200));
-    if (res.error) throw new Error(res.error.message);
+    console.log('[PreuUDD] Respuesta Firestore:', JSON.stringify(res).slice(0,300));
+    if (res.error) {
+      setStatus('Error Firebase: ' + res.error.message + ' (código: ' + res.error.code + ')', '#c00');
+      return;
+    }
     setStatus('✓ Guardado: "' + name + '"', '#369C9B');
   }).catch(function(e) {
     console.error('[PreuUDD] Error fetch:', e);
-    setStatus('Error: ' + e.message, '#c00');
+    setStatus('Error de red: ' + e.message, '#c00');
   });
 });
 
