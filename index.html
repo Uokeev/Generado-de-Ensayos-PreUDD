@@ -82,6 +82,10 @@ body{font-family:'Poppins',Arial,sans-serif;background:#f0f2f4;color:#1a1a1a}
 .pinstr{background:#f5f5f5;border-left:2px solid;padding:3px 6px;font-size:7px;color:#444;margin-bottom:8px}
 .ppq{margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid #f0f0f0}
 .ppq:last-child{border-bottom:none}
+#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);background:#2D3748;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .3s;opacity:0;pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+#toast.ok{background:#369C9B}
+#toast.err{background:#c00}
 .mode-card{flex:1;border:2px solid var(--brd);border-radius:10px;padding:.8rem 1rem;cursor:pointer;text-align:center;background:var(--bg);transition:border-color .15s,background .15s}
 .mode-card:hover{border-color:var(--acc);background:var(--fondo)}
 .mode-card-sel{border-color:var(--acc);background:var(--fondo)}
@@ -102,6 +106,7 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
 </style>
 </head>
 <body>
+<div id="toast"></div>
 <div class="topbar">
   <img id="toplogo" style="height:30px;width:auto" alt="PreuUDD">
   <span style="font-size:13px;color:rgba(255,255,255,.65)">Generador de Material PAES 2026</span>
@@ -216,7 +221,7 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
     </div>
   </div>
   <!-- Draft status -->
-  <div id="draft-status" style="font-size:11px;color:var(--t2);text-align:right;margin-top:6px;min-height:16px"></div>
+  <div id="draft-status" style="display:none"></div>
   <!-- Drafts modal -->
   <div id="drafts-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
     <div style="background:#fff;border-radius:14px;padding:1.4rem;width:90%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;gap:10px">
@@ -1245,9 +1250,25 @@ function fbDelete(id) {
 
 function initDB(){ return true; } // kept for compatibility
 
+var toastTimer;
 function setStatus(msg, color) {
+  // Keep the small status div too
   var el = $('draft-status');
-  if (el) { el.textContent = msg; el.style.color = color || 'var(--t2)'; }
+  if (el) { el.textContent = msg; el.style.color = color||'var(--t2)'; }
+  // Show toast
+  var t = $('toast');
+  if (!t) return;
+  clearTimeout(toastTimer);
+  t.textContent = msg;
+  t.className = '';
+  if (color === '#369C9B' || color === '#aaa') t.className = 'ok';
+  else if (color === '#c00') t.className = 'err';
+  // Force reflow then show
+  void t.offsetWidth;
+  t.classList.add('show');
+  toastTimer = setTimeout(function() {
+    t.classList.remove('show');
+  }, 3500);
 }
 
 function serializeState() {
