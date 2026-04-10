@@ -86,6 +86,12 @@ body{font-family:'Poppins',Arial,sans-serif;background:#f0f2f4;color:#1a1a1a}
 #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 #toast.ok{background:#369C9B}
 #toast.err{background:#c00}
+#save-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1001;align-items:center;justify-content:center}
+#save-modal.open{display:flex}
+#save-modal .sm-box{background:#fff;border-radius:14px;padding:1.4rem;width:90%;max-width:360px;display:flex;flex-direction:column;gap:12px}
+#save-modal input{font-size:14px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--brd);font-family:inherit;width:100%;outline:none}
+#save-modal input:focus{border-color:var(--acc)}
+#save-modal .sm-row{display:flex;gap:8px;justify-content:flex-end}
 .mode-card{flex:1;border:2px solid var(--brd);border-radius:10px;padding:.8rem 1rem;cursor:pointer;text-align:center;background:var(--bg);transition:border-color .15s,background .15s}
 .mode-card:hover{border-color:var(--acc);background:var(--fondo)}
 .mode-card-sel{border-color:var(--acc);background:var(--fondo)}
@@ -225,6 +231,17 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
 
 </div>
 </div>
+  <!-- Save name modal -->
+  <div id="save-modal">
+    <div class="sm-box">
+      <div style="font-size:15px;font-weight:600;color:#2D3748">Guardar borrador</div>
+      <input id="save-name-inp" type="text" placeholder="Nombre del borrador...">
+      <div class="sm-row">
+        <button id="save-cancel" class="btn btns" style="padding:.4rem 1rem">Cancelar</button>
+        <button id="save-confirm" class="btn btnp" style="padding:.4rem 1rem">Guardar</button>
+      </div>
+    </div>
+  </div>
   <!-- Drafts modal — outside steps so works from any page -->
   <div id="drafts-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
     <div style="background:#fff;border-radius:14px;padding:1.4rem;width:90%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;gap:10px">
@@ -1235,11 +1252,16 @@ function fbAdd(data) {
 }
 
 function fbList() {
-  return fetch(FB_BASE+'?key='+FB_KEY+'&orderBy=fields.savedAt%20desc&pageSize=20')
+  // Use runQuery for ordered results — simpler GET doesn't support orderBy without index
+  var url = 'https://firestore.googleapis.com/v1/projects/'+FB_PROJECT+'/databases/(default)/documents/borradores?key='+FB_KEY+'&pageSize=20';
+  return fetch(url)
     .then(function(r){ return r.json(); })
     .then(function(data){
       if (!data.documents) return [];
-      return data.documents.map(fbToObj);
+      var docs = data.documents.map(fbToObj);
+      // Sort by savedAt descending client-side
+      docs.sort(function(a,b){ return (b.savedAt||'').localeCompare(a.savedAt||''); });
+      return docs;
     });
 }
 
@@ -1298,45 +1320,48 @@ function serializeState() {
   };
 }
 
-$('btn-save-draft').addEventListener('click', function() {
-  console.log('[PreuUDD] Botón guardar presionado');
-  setStatus('Iniciando guardado...', '#369C9B');
-  var nombreEl = $('f-nombre');
-  console.log('[PreuUDD] f-nombre:', nombreEl ? nombreEl.value : 'NO ENCONTRADO');
-  var name = prompt('Nombre del borrador:', (nombreEl||{value:''}).value || 'Borrador');
-  console.log('[PreuUDD] Nombre ingresado:', name);
-  if (!name) { console.log('[PreuUDD] Cancelado'); return; }
+function doSave(name) {
+  if (!name || !name.trim()) return;
+  name = name.trim();
   setStatus('Guardando...', '#369C9B');
   var data;
-  try {
-    data = serializeState();
-    console.log('[PreuUDD] serializeState OK, items:', data.items ? data.items.length : 0);
-  } catch(e) {
-    console.error('[PreuUDD] Error en serializeState:', e);
-    setStatus('Error interno: ' + e.message, '#c00');
-    return;
+  try { data = serializeState(); } catch(e) {
+    setStatus('Error interno: ' + e.message, '#c00'); return;
   }
   data.name = name;
   var json = JSON.stringify(data);
-  console.log('[PreuUDD] Tamaño borrador:', json.length, 'bytes');
   if (json.length > 900000) {
-    setStatus('Borrador muy grande. Reduce el tamaño de las imágenes.', '#c00');
-    return;
+    setStatus('Borrador muy grande. Reduce el tamaño de las imágenes.', '#c00'); return;
   }
-  console.log('[PreuUDD] Enviando a Firestore:', FB_BASE);
-  setStatus('Conectando con Firebase...', '#369C9B');
   fbAdd(data).then(function(res) {
-    console.log('[PreuUDD] Respuesta Firestore:', JSON.stringify(res).slice(0,300));
-    if (res.error) {
-      setStatus('Error Firebase: ' + res.error.message + ' (código: ' + res.error.code + ')', '#c00');
-      return;
-    }
+    if (res.error) { setStatus('Error: ' + res.error.message, '#c00'); return; }
     setStatus('✓ Guardado: "' + name + '"', '#369C9B');
-  }).catch(function(e) {
-    console.error('[PreuUDD] Error fetch:', e);
-    setStatus('Error de red: ' + e.message, '#c00');
-  });
+  }).catch(function(e) { setStatus('Error de red: ' + e.message, '#c00'); });
+}
+
+function openSaveModal() {
+  var inp = $('save-name-inp');
+  var nombre = ($('f-nombre')||{value:''}).value || 'Borrador';
+  if (inp) inp.value = nombre;
+  $('save-modal').classList.add('open');
+  setTimeout(function(){ if(inp) inp.focus(); inp.select(); }, 100);
+}
+
+$('save-cancel').addEventListener('click', function() { $('save-modal').classList.remove('open'); });
+$('save-confirm').addEventListener('click', function() {
+  var name = ($('save-name-inp')||{value:''}).value;
+  $('save-modal').classList.remove('open');
+  doSave(name);
 });
+$('save-name-inp').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { $('save-modal').classList.remove('open'); doSave(this.value); }
+  if (e.key === 'Escape') { $('save-modal').classList.remove('open'); }
+});
+$('save-modal').addEventListener('click', function(e) {
+  if (e.target === $('save-modal')) $('save-modal').classList.remove('open');
+});
+
+$('btn-save-draft').addEventListener('click', openSaveModal);
 
 function openDraftsModal() {
   var modal = $('drafts-modal');
