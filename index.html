@@ -114,7 +114,7 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
 <body>
 <div id="toast"></div>
 <div class="topbar">
-  <img id="toplogo" style="height:30px;width:auto" alt="PreuUDD">
+  <img id="toplogo" style="height:30px;width:auto;cursor:pointer" alt="PreuUDD" title="Volver al inicio">
   <span style="font-size:13px;color:rgba(255,255,255,.65)">Generador de Material PAES 2026</span>
 </div>
 <div class="app">
@@ -231,6 +231,17 @@ code{background:#d8eeee;padding:1px 5px;border-radius:3px;font-size:10px}
 
 </div>
 </div>
+  <!-- Confirm modal -->
+  <div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1002;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:14px;padding:1.4rem;width:90%;max-width:340px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:15px;font-weight:600;color:#2D3748" id="confirm-title">¿Volver al inicio?</div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.5" id="confirm-msg">Se perderán los cambios no guardados.</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="confirm-cancel" class="btn btns" style="padding:.4rem 1rem">Cancelar</button>
+        <button id="confirm-ok" class="btn btnp" style="padding:.4rem 1rem">Confirmar</button>
+      </div>
+    </div>
+  </div>
   <!-- Save name modal -->
   <div id="save-modal">
     <div class="sm-box">
@@ -273,6 +284,20 @@ function toTitleCase(str){
 }
 
 $('toplogo').src=LOGO;
+$('toplogo').addEventListener('click', function(){
+  showConfirm('¿Volver al inicio?', 'Se perderán los cambios no guardados. Guarda un borrador si quieres conservarlos.', function(){
+    document.querySelectorAll('.step').forEach(function(s){ s.classList.remove('active'); });
+    $('s1').classList.add('active');
+    $('pqs').innerHTML=''; pqN=0;
+    S.area=''; S.acc='#369C9B'; S.accBg='#D4EEED'; S.tipo=''; S.tiempo=''; S.mode='ensayo';
+    setAcc(S.acc);
+    document.querySelectorAll('.acard').forEach(function(c){ c.classList.remove('sel'); });
+    document.querySelectorAll('.mode-card').forEach(function(c){ c.classList.toggle('mode-card-sel', c.dataset.mode==='ensayo'); });
+    $('b1').disabled=true; $('b2btn').disabled=true;
+    currentDraftId=null;
+    var s1t=$('s1-title'); if(s1t) s1t.textContent='Nuevo documento';
+  });
+});
 
 document.querySelectorAll('.mode-card').forEach(function(c){
   c.addEventListener('click',function(){
@@ -1202,6 +1227,7 @@ var FB_PROJECT = 'preudd-generador';
 var FB_KEY = 'AIzaSyA7vGw8GqQMBaE6ivpIgF-t-rEqWdfHzmA';
 var FB_BASE = 'https://firestore.googleapis.com/v1/projects/'+FB_PROJECT+'/databases/(default)/documents/borradores';
 console.log('[PreuUDD] FB_BASE:', FB_BASE);
+var currentDraftId = null; // tracks the active draft document ID
 
 function fbToObj(doc) {
   // Convert Firestore document fields to plain JS object
@@ -1247,6 +1273,13 @@ function objToFb(obj) {
 function fbAdd(data) {
   return fetch(FB_BASE+'?key='+FB_KEY, {
     method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(objToFb(data))
+  }).then(function(r){ return r.json(); });
+}
+
+function fbUpdate(id, data) {
+  return fetch(FB_BASE+'/'+id+'?key='+FB_KEY, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(objToFb(data))
   }).then(function(r){ return r.json(); });
 }
@@ -1320,10 +1353,10 @@ function serializeState() {
   };
 }
 
-function doSave(name) {
+function doSave(name, silent) {
   if (!name || !name.trim()) return;
   name = name.trim();
-  setStatus('Guardando...', '#369C9B');
+  if (!silent) setStatus('Guardando...', '#369C9B');
   var data;
   try { data = serializeState(); } catch(e) {
     setStatus('Error interno: ' + e.message, '#c00'); return;
@@ -1333,10 +1366,23 @@ function doSave(name) {
   if (json.length > 900000) {
     setStatus('Borrador muy grande. Reduce el tamaño de las imágenes.', '#c00'); return;
   }
-  fbAdd(data).then(function(res) {
-    if (res.error) { setStatus('Error: ' + res.error.message, '#c00'); return; }
-    setStatus('✓ Guardado: "' + name + '"', '#369C9B');
-  }).catch(function(e) { setStatus('Error de red: ' + e.message, '#c00'); });
+  if (currentDraftId) {
+    // Update existing document
+    fbUpdate(currentDraftId, data).then(function(res) {
+      if (res.error) { setStatus('Error: ' + res.error.message, '#c00'); return; }
+      if (!silent) setStatus('✓ Guardado: "' + name + '"', '#369C9B');
+      else setStatus('Autoguardado ✓', '#aaa');
+    }).catch(function(e) { setStatus('Error de red: ' + e.message, '#c00'); });
+  } else {
+    // Create new document
+    fbAdd(data).then(function(res) {
+      if (res.error) { setStatus('Error: ' + res.error.message, '#c00'); return; }
+      // Store the new document ID
+      currentDraftId = (res.name||'').split('/').pop();
+      if (!silent) setStatus('✓ Guardado: "' + name + '"', '#369C9B');
+      else setStatus('Autoguardado ✓', '#aaa');
+    }).catch(function(e) { setStatus('Error de red: ' + e.message, '#c00'); });
+  }
 }
 
 function openSaveModal() {
@@ -1348,6 +1394,27 @@ function openSaveModal() {
 }
 
 $('save-cancel').addEventListener('click', function() { $('save-modal').classList.remove('open'); });
+
+// Confirm modal
+var confirmCallback = null;
+function showConfirm(title, msg, onOk) {
+  $('confirm-title').textContent = title;
+  $('confirm-msg').textContent = msg;
+  confirmCallback = onOk;
+  $('confirm-modal').style.display = 'flex';
+}
+$('confirm-cancel').addEventListener('click', function() {
+  $('confirm-modal').style.display = 'none';
+  confirmCallback = null;
+});
+$('confirm-ok').addEventListener('click', function() {
+  $('confirm-modal').style.display = 'none';
+  if (confirmCallback) confirmCallback();
+  confirmCallback = null;
+});
+$('confirm-modal').addEventListener('click', function(e) {
+  if (e.target === $('confirm-modal')) { $('confirm-modal').style.display = 'none'; confirmCallback = null; }
+});
 $('save-confirm').addEventListener('click', function() {
   var name = ($('save-name-inp')||{value:''}).value;
   $('save-modal').classList.remove('open');
@@ -1410,6 +1477,7 @@ $('modal-close').addEventListener('click', function() { $('drafts-modal').style.
 $('drafts-modal').addEventListener('click', function(e) { if(e.target===$('drafts-modal')) $('drafts-modal').style.display='none'; });
 
 function loadDraft(d) {
+  currentDraftId = d._id || null;
   S.mode = d.mode || 'ensayo';
   S.area = d.area || 'ciencias';
   S.acc = d.acc || '#369C9B';
@@ -1452,18 +1520,14 @@ function loadDraft(d) {
   setStatus('✓ Borrador "' + (d.name||'') + '" cargado.', '#369C9B');
 }
 
-// Autosave every 3 minutes
+// Autosave every 3 minutes — updates same document
 setInterval(function() {
   var pqsEl = $('pqs');
   if (!pqsEl || pqsEl.querySelectorAll('.pqb').length === 0) return;
   var nombre = ($('f-nombre')||{value:''}).value;
   if (!nombre) return;
-  var data = serializeState();
-  data.name = '(auto) ' + nombre;
-  fbAdd(data).then(function() {
-    setStatus('Autoguardado', '#aaa');
-    setTimeout(function(){ setStatus(''); }, 3000);
-  });
+  var name = currentDraftId ? nombre : '(auto) ' + nombre;
+  doSave(name, true);
 }, 3 * 60 * 1000);
 
 return{};
